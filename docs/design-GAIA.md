@@ -185,24 +185,24 @@ Protocols P1, P2, P3 and P6 connect roles that are all played by `Main`. They ar
 
 | Role | Service / protocol | Implementation | Location |
 | --- | --- | --- | --- |
-| OM | Order loop (P1 initiator) | `+!orderLoop(pp)` | `Main.astra:123`, end of queue `:144` |
-| OM | LoadOrder | `+!order(name, order)` → `PackagingPoint.setOrder` | `Base.astra:166`, `PackagingPoint.java:41` |
-| OM | DeliverOrder | `+?orderStatus` + `+!deliver` → `PackagingPoint.deliver` | `Base.astra:335`, `:344`, `PackagingPoint.java:50` |
-| OM | AbandonOrder | `try … recover` inside `+!orderLoop` | `Main.astra:123` |
-| PP | ExpandDependencies | `+!expand(item)` (recipe / stock / unknown → fail) | `Base.astra:410`, `:419`, `:422` |
-| PP | Produce | `+!produceItem` (multi-level / raw) → `+!runStep` | `Base.astra:349`, `:361`, `:367` |
-| PP | Supply inputs / StoreIntermediate | `+!supply` (from SP / from AP), `+!storeItem` | `Base.astra:388`, `:393`, `:399` |
-| PP | RetrieveMaterial | `+!available` → `AccessPoint.retrieve` | `Base.astra:108` |
-| RB | AssignTransport (P2 responder, P4 initiator) | `+!transfer(from, to)` picks `idle(r)` → `+!transfer(r, from, to)` | `Main.astra:61`, `:67`, `:78` |
-| RB | TransportResult (P5) | `@message(inform, transferred)`, `@message(failure, transfer)` | `Main.astra:95`, `:90` |
-| RB | RobotReady (P7) | `@message(inform, ready)` → `+idle(r)` | `Main.astra:73` |
-| RB | Runtime discovery | `+!discoverZones` → `Floorplan.zonesOfType` | `Base.astra:314`, `Floorplan.java:93` |
-| T | ExecuteTransfer (P4 responder, P5 initiator) | `@message(request, transfer)` with `try/recover` | `Robot.astra:19` |
-| T | MoveTo (waits for a free zone) | `+!at` → `+!waitFree` → `Robot.move` | `Base.astra:222`, `:229` |
-| T | Load / Unload | `+!holding`, `+!empty` | `Base.astra:239`, `:254` |
-| T | Recharge + RobotReady (P7) | `+!recharge` | `Robot.astra:38` |
-| WM | OperateWorkstation | `+?state`, `+?inputsNeeded`, `+!operate` | `Base.astra:287`, `:280`, `:297` |
-| MK | RecordEvent (P6) | `Metrics.orderStarted`, `Metrics.orderFulfilled` | `Metrics.java:28`, `:35` |
+| OM | Order loop (P1 initiator) | `+!orderLoop(pp)` | [Main.astra:123](../manufacturing-mayhem/src/main/astra/Main.astra#L123), end of queue [:144](../manufacturing-mayhem/src/main/astra/Main.astra#L144) |
+| OM | LoadOrder | `+!order(name, order)` → `PackagingPoint.setOrder` | [Base.astra:166](../manufacturing-mayhem/src/main/astra/Base.astra#L166), [PackagingPoint.java:41](../manufacturing-mayhem/src/main/java/artifacts/PackagingPoint.java#L41) |
+| OM | DeliverOrder | `+?orderStatus` + `+!deliver` → `PackagingPoint.deliver` | [Base.astra:335](../manufacturing-mayhem/src/main/astra/Base.astra#L335), [:344](../manufacturing-mayhem/src/main/astra/Base.astra#L344), [PackagingPoint.java:50](../manufacturing-mayhem/src/main/java/artifacts/PackagingPoint.java#L50) |
+| OM | AbandonOrder | `try … recover` inside `+!orderLoop` | [Main.astra:123](../manufacturing-mayhem/src/main/astra/Main.astra#L123) |
+| PP | ExpandDependencies | `+!expand(item)` (recipe / stock / unknown → fail) | [Base.astra:410](../manufacturing-mayhem/src/main/astra/Base.astra#L410), [:419](../manufacturing-mayhem/src/main/astra/Base.astra#L419), [:422](../manufacturing-mayhem/src/main/astra/Base.astra#L422) |
+| PP | Produce | `+!produceItem` (multi-level / raw) → `+!runStep` | [Base.astra:349](../manufacturing-mayhem/src/main/astra/Base.astra#L349), [:361](../manufacturing-mayhem/src/main/astra/Base.astra#L361), [:367](../manufacturing-mayhem/src/main/astra/Base.astra#L367) |
+| PP | Supply inputs / StoreIntermediate | `+!supply` (from SP / from AP), `+!storeItem` | [Base.astra:388](../manufacturing-mayhem/src/main/astra/Base.astra#L388), [:393](../manufacturing-mayhem/src/main/astra/Base.astra#L393), [:399](../manufacturing-mayhem/src/main/astra/Base.astra#L399) |
+| PP | RetrieveMaterial | `+!available` → `AccessPoint.retrieve` | [Base.astra:108](../manufacturing-mayhem/src/main/astra/Base.astra#L108) |
+| RB | AssignTransport (P2 responder, P4 initiator) | `+!transfer(from, to)` picks `idle(r)` → `+!transfer(r, from, to)` | [Main.astra:61](../manufacturing-mayhem/src/main/astra/Main.astra#L61), [:67](../manufacturing-mayhem/src/main/astra/Main.astra#L67), [:78](../manufacturing-mayhem/src/main/astra/Main.astra#L78) |
+| RB | TransportResult (P5) | `@message(inform, transferred)`, `@message(failure, transfer)` | [Main.astra:95](../manufacturing-mayhem/src/main/astra/Main.astra#L95), [:90](../manufacturing-mayhem/src/main/astra/Main.astra#L90) |
+| RB | RobotReady (P7) | `@message(inform, ready)` → `+idle(r)` | [Main.astra:73](../manufacturing-mayhem/src/main/astra/Main.astra#L73) |
+| RB | Runtime discovery | `+!discoverZones` → `Floorplan.zonesOfType` | [Base.astra:314](../manufacturing-mayhem/src/main/astra/Base.astra#L314), [Floorplan.java:93](../manufacturing-mayhem/src/main/java/artifacts/Floorplan.java#L93) |
+| T | ExecuteTransfer (P4 responder, P5 initiator) | `@message(request, transfer)` with `try/recover` | [Robot.astra:19](../manufacturing-mayhem/src/main/astra/Robot.astra#L19) |
+| T | MoveTo (waits for a free zone) | `+!at` → `+!waitFree` → `Robot.move` | [Base.astra:222](../manufacturing-mayhem/src/main/astra/Base.astra#L222), [:229](../manufacturing-mayhem/src/main/astra/Base.astra#L229) |
+| T | Load / Unload | `+!holding`, `+!empty` | [Base.astra:239](../manufacturing-mayhem/src/main/astra/Base.astra#L239), [:254](../manufacturing-mayhem/src/main/astra/Base.astra#L254) |
+| T | Recharge + RobotReady (P7) | `+!recharge` | [Robot.astra:38](../manufacturing-mayhem/src/main/astra/Robot.astra#L38) |
+| WM | OperateWorkstation | `+?state`, `+?inputsNeeded`, `+!operate` | [Base.astra:287](../manufacturing-mayhem/src/main/astra/Base.astra#L287), [:280](../manufacturing-mayhem/src/main/astra/Base.astra#L280), [:297](../manufacturing-mayhem/src/main/astra/Base.astra#L297) |
+| MK | RecordEvent (P6) | `Metrics.orderStarted`, `Metrics.orderFulfilled` | [Metrics.java:28](../manufacturing-mayhem/src/main/java/artifacts/Metrics.java#L28), [:35](../manufacturing-mayhem/src/main/java/artifacts/Metrics.java#L35) |
 
 **Example chain: requirement → role → protocol → plan**
 
