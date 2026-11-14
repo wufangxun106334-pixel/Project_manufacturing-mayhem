@@ -17,3 +17,4 @@ docs/backup/
 # 运行日志 / 临时文件
 manufacturing-mayhem/*.log
 manufacturing-mayhem/cp.txt
+.claude/
