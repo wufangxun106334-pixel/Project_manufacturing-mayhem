@@ -1,0 +1,99 @@
+{
+  "$schema": "../src/main/resources/schema/factory.schema.json",
+  "name": "Crowded floor",
+  "description": "Six robots, a mixed fleet, but only one access point and one storage point. A move to an occupied location fails, so this tests whether a strategy avoids robots getting in each other's way.",
+  "seed": 1010,
+  "warehouse": {
+    "apples": 24,
+    "pastry": 24
+  },
+  "accessPoints": [
+    "ap1"
+  ],
+  "storagePoints": [
+    "sp1"
+  ],
+  "packagingPoints": [
+    "pp1",
+    "pp2"
+  ],
+  "workstations": [
+    {
+      "name": "ws1",
+      "inputs": [
+        "apples",
+        "pastry"
+      ],
+      "output": "apple-pie",
+      "duration": 2000
+    },
+    {
+      "name": "ws2",
+      "inputs": [
+        "apples",
+        "pastry"
+      ],
+      "output": "apple-pie",
+      "duration": 2000
+    }
+  ],
+  "robots": [
+    {
+      "name": "r1",
+      "maxEnergy": 1200,
+      "chargeRate": 200,
+      "agent": "Robot"
+    },
+    {
+      "name": "r2",
+      "maxEnergy": 1200,
+      "chargeRate": 200,
+      "agent": "Robot"
+    },
+    {
+      "name": "r3",
+      "maxEnergy": 1200,
+      "chargeRate": 200,
+      "agent": "Robot"
+    },
+    {
+      "name": "r4",
+      "maxEnergy": 600,
+      "chargeRate": 400,
+      "agent": "Robot"
+    },
+    {
+      "name": "r5",
+      "maxEnergy": 600,
+      "chargeRate": 400,
+      "agent": "Robot"
+    },
+    {
+      "name": "r6",
+      "maxEnergy": 600,
+      "chargeRate": 400,
+      "agent": "Robot"
+    }
+  ],
+  "orders": {
+    "items": [
+      "apple-pie"
+    ],
+    "count": 12
+  },
+  "options": {
+    "travelDistance": {
+      "enabled": true
+    },
+    "orderArrivals": {
+      "enabled": false,
+      "initialOrders": 1,
+      "meanInterval": 30000
+    },
+    "breakdowns": {
+      "enabled": false,
+      "probability": 0.05,
+      "repairTime": 15000
+    }
+  }
+}

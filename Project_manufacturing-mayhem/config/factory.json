@@ -1,0 +1,27 @@
+{
+  "$schema": "../src/main/resources/schema/factory.schema.json",
+  "name": "Apple pie bakery",
+  "warehouse": {
+    "apples": 6,
+    "pastry": 10
+  },
+  "accessPoints": ["ap1", "ap2"],
+  "storagePoints": ["sp1"],
+  "packagingPoints": ["pp1", "pp2"],
+  "workstations": [
+    {
+      "name": "ws1",
+      "inputs": ["apples", "pastry"],
+      "output": "apple-pie",
+      "duration": 2000
+    }
+  ],
+  "robots": [
+    { "name": "r1", "maxEnergy": 800, "chargeRate": 300, "agent": "Robot" },
+    { "name": "r2", "maxEnergy": 800, "chargeRate": 200 }
+  ],
+  "orders": {
+    "items": ["apple-pie"],
+    "count": 3
+  }
+}

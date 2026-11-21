@@ -1,0 +1,101 @@
+{
+  "$schema": "../src/main/resources/schema/factory.schema.json",
+  "name": "Product mix",
+  "description": "Pies, cakes and bread from three workstations, with orders arriving over time. Tests matching robots to the right work so that every workstation with ordered output is kept busy.",
+  "seed": 808,
+  "warehouse": {
+    "apples": 18,
+    "pastry": 18,
+    "flour": 18,
+    "eggs": 18,
+    "sugar": 18,
+    "water": 18
+  },
+  "accessPoints": [
+    "ap1",
+    "ap2",
+    "ap3"
+  ],
+  "storagePoints": [
+    "sp1",
+    "sp2"
+  ],
+  "packagingPoints": [
+    "pp1",
+    "pp2",
+    "pp3"
+  ],
+  "workstations": [
+    {
+      "name": "ws1",
+      "inputs": [
+        "apples",
+        "pastry"
+      ],
+      "output": "apple-pie",
+      "duration": 2000
+    },
+    {
+      "name": "ws2",
+      "inputs": [
+        "flour",
+        "eggs",
+        "sugar"
+      ],
+      "output": "cake",
+      "duration": 4000
+    },
+    {
+      "name": "ws3",
+      "inputs": [
+        "flour",
+        "water"
+      ],
+      "output": "bread",
+      "duration": 3000
+    }
+  ],
+  "robots": [
+    {
+      "name": "r1",
+      "maxEnergy": 800,
+      "chargeRate": 300,
+      "agent": "Robot"
+    },
+    {
+      "name": "r2",
+      "maxEnergy": 800,
+      "chargeRate": 300,
+      "agent": "Robot"
+    },
+    {
+      "name": "r3",
+      "maxEnergy": 800,
+      "chargeRate": 300,
+      "agent": "Robot"
+    }
+  ],
+  "orders": {
+    "items": [
+      "apple-pie",
+      "cake",
+      "bread"
+    ],
+    "count": 9
+  },
+  "options": {
+    "travelDistance": {
+      "enabled": true
+    },
+    "orderArrivals": {
+      "enabled": true,
+      "initialOrders": 3,
+      "meanInterval": 30000
+    },
+    "breakdowns": {
+      "enabled": false,
+      "probability": 0.05,
+      "repairTime": 15000
+    }
+  }
+}

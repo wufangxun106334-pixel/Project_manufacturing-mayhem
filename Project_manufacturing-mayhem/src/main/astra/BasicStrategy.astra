@@ -1,0 +1,106 @@
+// The sample control strategy: robot r1 makes apple pies at ws1, one step at a time, and every
+// order is filled at packaging point pp1. Main creates this agent once the factory has been
+// configured.
+agent BasicStrategy extends core.Base {
+    initial !start();
+
+    plan +!start() {
+        cartago.link();
+
+        // Find the artifacts that the factory agent created (and that will be used by this agent)
+        !floorplan(cartago.ArtifactId fpId);
+        !warehouse(cartago.ArtifactId wId);
+        !accessPoint("ap1", cartago.ArtifactId ap1Id);
+        !storagePoint("sp1", cartago.ArtifactId sp1Id);
+        !packagingPoint("pp1", cartago.ArtifactId pp1Id);
+        !workstation("ws1", cartago.ArtifactId ws1Id);
+        !orders(cartago.ArtifactId oId);
+
+        // You can discover a list of the current locations by examining the floorplan...
+        ?locations(list L);
+        cartago.println("L=" + L);
+
+        !fulfilOrders();
+    }
+
+    plan +!fulfilOrders() {
+        // Work through the orders: each is for 1 or 2 apple pies and is filled at pp1. With
+        // order arrivals on, some orders arrive later, so wait for them when none are waiting.
+        ?outstandingOrders(int waiting);
+        ?ordersToArrive(int coming);
+        int remaining = waiting + coming;
+        while (remaining > 0) {
+            if (waiting == 0) {
+                S.sleep(1000);
+            } else {
+                ?nextOrder(string nextId, string item, int quantity);
+                cartago.println("next order: " + nextId + " (" + quantity + " x " + item + "), " + remaining + " still to assign (including any yet to arrive)");
+                !assign("pp1", string orderId);
+
+                // Example: Robot r1 is assigned to ap1 and ws1. ws1 can be used to make apple pies.
+                //          r1 retrieves the necessary ingredients and then creates the apple pie
+                //          it should drop the apple pie to the packaging point for delivery...
+                //          This is repeated until pp1 has everything the order needs.
+                ?outstanding("pp1", list needed);
+                while (P.size(needed) > 0) {
+                    !makeApplePie();
+
+                    // ROBOT: Pickup the output when finished...
+                    !transfer("r1", "ws1", "sp1");
+
+                    ?available("sp1", string spItem);
+
+                    !transfer("r1", "sp1", "pp1");
+
+                    ?outstanding("pp1", list needed2);
+                    needed = needed2;
+                }
+
+                // Send the order; it is marked as COMPLETED and moved to the archive
+                !deliver("pp1");
+                cartago.println(orderId + " delivered");
+            }
+
+            ?outstandingOrders(int nowWaiting);
+            ?ordersToArrive(int stillComing);
+            waiting = nowWaiting;
+            remaining = nowWaiting + stillComing;
+        }
+        cartago.println("all orders delivered");
+    }
+
+    plan +!makeApplePie() {
+        // Retrieve an item from the warehouse and place at ap1
+        !available("ap1", "apples");
+
+        // ROBOT: Move item from ap1 to ws1
+        !transfer("r1", "ap1", "ws1");
+
+        // Example of retrieving an item based on the
+        // inputsNeeded property of the workstation.
+        ?inputsNeeded("ws1", list items);
+        !available("ap1", P.headAsString(items));
+
+        // ROBOT: Move item from ap1 to ws1
+        !transfer("r1", "ap1", "ws1");
+
+        // Check what the state of ws1 is (not a robot operation)
+        ?state("ws1", string state);
+        cartago.println("ws1 is: " + state);
+
+        // Now, operate the workstation (not the robot)
+        !operate("ws1");
+    }
+
+    // Ask a robot agent to move an item, and wait until it has
+    plan +!transfer(string name, string from, string to) {
+        send(request, name, transfer(from, to));
+        wait(transferred(from, to));
+        -transferred(from, to);
+    }
+
+    plan @message(inform, string sender, transferred(string from, string to)) {
+        cartago.println(sender + " is at location: " + to);
+        +transferred(from, to);
+    }
+}

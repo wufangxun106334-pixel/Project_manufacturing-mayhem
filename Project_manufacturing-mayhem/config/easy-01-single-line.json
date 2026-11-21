@@ -1,0 +1,59 @@
+{
+  "$schema": "../src/main/resources/schema/factory.schema.json",
+  "name": "Single line",
+  "description": "One robot, one workstation and one packaging point make apple pies. The baseline that other scenarios are compared against.",
+  "seed": 101,
+  "warehouse": {
+    "apples": 6,
+    "pastry": 6
+  },
+  "accessPoints": [
+    "ap1"
+  ],
+  "storagePoints": [
+    "sp1"
+  ],
+  "packagingPoints": [
+    "pp1"
+  ],
+  "workstations": [
+    {
+      "name": "ws1",
+      "inputs": [
+        "apples",
+        "pastry"
+      ],
+      "output": "apple-pie",
+      "duration": 2000
+    }
+  ],
+  "robots": [
+    {
+      "name": "r1",
+      "maxEnergy": 800,
+      "chargeRate": 300,
+      "agent": "Robot"
+    }
+  ],
+  "orders": {
+    "items": [
+      "apple-pie"
+    ],
+    "count": 3
+  },
+  "options": {
+    "travelDistance": {
+      "enabled": false
+    },
+    "orderArrivals": {
+      "enabled": false,
+      "initialOrders": 1,
+      "meanInterval": 30000
+    },
+    "breakdowns": {
+      "enabled": false,
+      "probability": 0.05,
+      "repairTime": 15000
+    }
+  }
+}

@@ -1,0 +1,43 @@
+agent Robot extends core.Base {
+    initial !init();
+
+    plan +!init() {
+    	cartago.link();
+
+        !floorplan(cartago.ArtifactId _);
+        !robot(S.name(), cartago.ArtifactId rid);
+        cartago.focus(rid);
+
+        // Sleep for a second to let the property
+        // updates get processed...
+        S.sleep(1000);
+    }
+
+    plan @message(request, string sender, transfer(string from, string to)) {
+        cartago.println("received request for transfer from: "  + from + " to: " +to);
+
+        // ADDED (course project change): supplied 版本任何一步抛异常都不回信，
+        // 请求方会永久阻塞在 wait 上；这里补 failure 分支。
+        try {
+            !at(S.name(), from);
+            !holding(S.name(), string _);
+            !at(S.name(), to);
+            !empty(S.name());
+
+            cartago.println("completed transfer from: "  + from + " to: " +to);
+
+            // Example Charging Step...
+            !at(S.name(), S.name()+"-charger");
+            cartago.println("Charging...");
+            !charged(S.name());
+            cartago.println("Charged...");
+
+            send(inform, sender, transferred(from, to));
+        } recover {
+            cartago.println("[r] FAILED transfer from: " + from + " to: " + to);
+            send(failure, sender, transfer(from, to));
+        }
+    }
+
+
+}

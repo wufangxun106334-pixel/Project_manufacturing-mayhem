@@ -1,0 +1,87 @@
+{
+  "$schema": "../src/main/resources/schema/factory.schema.json",
+  "name": "Scarce stock with breakdowns",
+  "description": "Two products compete for exactly enough apples for the worst case, robots and workstations break down, and orders arrive over time. Tests prioritising scarce stock and recovering when parts of the factory stop.",
+  "seed": 1111,
+  "warehouse": {
+    "apples": 16,
+    "pastry": 16,
+    "butter": 16,
+    "oats": 16
+  },
+  "accessPoints": [
+    "ap1",
+    "ap2"
+  ],
+  "storagePoints": [
+    "sp1",
+    "sp2"
+  ],
+  "packagingPoints": [
+    "pp1",
+    "pp2"
+  ],
+  "workstations": [
+    {
+      "name": "ws1",
+      "inputs": [
+        "apples",
+        "pastry"
+      ],
+      "output": "apple-pie",
+      "duration": 2000
+    },
+    {
+      "name": "ws2",
+      "inputs": [
+        "apples",
+        "butter",
+        "oats"
+      ],
+      "output": "apple-crumble",
+      "duration": 4000
+    }
+  ],
+  "robots": [
+    {
+      "name": "r1",
+      "maxEnergy": 800,
+      "chargeRate": 300,
+      "agent": "Robot"
+    },
+    {
+      "name": "r2",
+      "maxEnergy": 800,
+      "chargeRate": 300,
+      "agent": "Robot"
+    },
+    {
+      "name": "r3",
+      "maxEnergy": 800,
+      "chargeRate": 300,
+      "agent": "Robot"
+    }
+  ],
+  "orders": {
+    "items": [
+      "apple-pie",
+      "apple-crumble"
+    ],
+    "count": 8
+  },
+  "options": {
+    "travelDistance": {
+      "enabled": true
+    },
+    "orderArrivals": {
+      "enabled": true,
+      "initialOrders": 3,
+      "meanInterval": 25000
+    },
+    "breakdowns": {
+      "enabled": true,
+      "probability": 0.05,
+      "repairTime": 15000
+    }
+  }
+}

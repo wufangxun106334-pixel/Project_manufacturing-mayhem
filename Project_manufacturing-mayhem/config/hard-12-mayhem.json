@@ -1,0 +1,123 @@
+{
+  "$schema": "../src/main/resources/schema/factory.schema.json",
+  "name": "Manufacturing mayhem",
+  "description": "Everything at once: a two-stage recipe and three products, a mixed fleet on tight batteries, travel distance, twenty orders arriving over time, and frequent breakdowns.",
+  "seed": 1212,
+  "warehouse": {
+    "flour": 40,
+    "water": 80,
+    "apples": 40,
+    "eggs": 40,
+    "sugar": 40
+  },
+  "accessPoints": [
+    "ap1",
+    "ap2",
+    "ap3"
+  ],
+  "storagePoints": [
+    "sp1",
+    "sp2",
+    "sp3"
+  ],
+  "packagingPoints": [
+    "pp1",
+    "pp2",
+    "pp3",
+    "pp4"
+  ],
+  "workstations": [
+    {
+      "name": "mixer",
+      "inputs": [
+        "flour",
+        "water"
+      ],
+      "output": "dough",
+      "duration": 3000
+    },
+    {
+      "name": "oven",
+      "inputs": [
+        "dough",
+        "apples"
+      ],
+      "output": "apple-pie",
+      "duration": 5000
+    },
+    {
+      "name": "ws3",
+      "inputs": [
+        "flour",
+        "eggs",
+        "sugar"
+      ],
+      "output": "cake",
+      "duration": 4000
+    },
+    {
+      "name": "ws4",
+      "inputs": [
+        "dough",
+        "water"
+      ],
+      "output": "bread",
+      "duration": 3000
+    }
+  ],
+  "robots": [
+    {
+      "name": "r1",
+      "maxEnergy": 850,
+      "chargeRate": 100,
+      "agent": "Robot"
+    },
+    {
+      "name": "r2",
+      "maxEnergy": 850,
+      "chargeRate": 100,
+      "agent": "Robot"
+    },
+    {
+      "name": "r3",
+      "maxEnergy": 800,
+      "chargeRate": 250,
+      "agent": "Robot"
+    },
+    {
+      "name": "r4",
+      "maxEnergy": 850,
+      "chargeRate": 250,
+      "agent": "Robot"
+    },
+    {
+      "name": "r5",
+      "maxEnergy": 800,
+      "chargeRate": 400,
+      "agent": "Robot"
+    }
+  ],
+  "orders": {
+    "items": [
+      "apple-pie",
+      "cake",
+      "bread"
+    ],
+    "count": 20
+  },
+  "options": {
+    "travelDistance": {
+      "enabled": true
+    },
+    "orderArrivals": {
+      "enabled": true,
+      "initialOrders": 4,
+      "meanInterval": 20000
+    },
+    "breakdowns": {
+      "enabled": true,
+      "probability": 0.08,
+      "repairTime": 20000
+    }
+  }
+}

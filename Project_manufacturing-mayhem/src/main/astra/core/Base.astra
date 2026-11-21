@@ -1,0 +1,387 @@
+package core;
+
+agent Base {
+    types main {
+        formula floorplan(cartago.ArtifactId);
+        
+        formula warehouse(cartago.ArtifactId);
+        formula accessPoint(string, cartago.ArtifactId);
+
+        formula storagePoint(string, cartago.ArtifactId);
+
+        formula chargePoint(string, cartago.ArtifactId);
+        formula robot(string, cartago.ArtifactId);
+        formula at(string, string);
+        formula chargeLevel(string, int);
+
+        formula workstation(string, cartago.ArtifactId);
+
+        formula packagingPoint(string, cartago.ArtifactId);
+
+        formula orders(cartago.ArtifactId);
+    }
+
+    // Requires the agent to be focussing on the robot with name (name)
+    inference at(string name, string location) :- 
+            robot(name, cartago.ArtifactId rid) & cartago.at(location);
+
+    types comms {
+        formula transfer(string, string);
+        formula transferred(string, string);
+        formula configure(string);
+        formula configured(string);
+    }
+
+    module Cartago cartago;
+    module System S;
+    module modules.PropertyExtractor pe;
+    module Prelude P;
+
+    //******************************************************************************************
+    // FLOORPLAN
+    //******************************************************************************************
+    plan +!floorplan(cartago.ArtifactId aid) {
+        try {
+            cartago.lookupArtifact("floorplan", aid);
+        } recover {
+            cartago.makeArtifact("floorplan", "artifacts.Floorplan", cartago.params([]), aid);
+        }
+        +floorplan(aid);
+    }
+
+    plan +?locations(list locations) :
+            floorplan(cartago.ArtifactId fpId) {
+        cartago.operation(fpId, observeProperty("locations", cartago.ArtifactObsProperty prop));
+        locations = pe.listValues(prop);
+    }
+
+    plan +?free(string location) :
+            floorplan(cartago.ArtifactId fpId) {
+        cartago.operation(fpId, isOccupied(location, boolean occupied));
+        if (occupied) S.fail();
+    }
+
+    //******************************************************************************************
+    // WAREHOUSE
+    //******************************************************************************************
+    plan +!warehouse(cartago.ArtifactId aid) {
+        try {
+            cartago.lookupArtifact("warehouse", aid);
+        } recover {
+            cartago.makeArtifact("warehouse", "artifacts.Warehouse", cartago.params([]), aid);
+        }
+        +warehouse(aid);
+    }
+
+    plan +!addToWarehouse(string item, int quantity) : warehouse(cartago.ArtifactId aid) {
+        cartago.operation(aid, add(item, quantity));
+    }
+
+    //******************************************************************************************
+    // ACCESS POINT
+    //******************************************************************************************
+    plan +!accessPoint(string name, cartago.ArtifactId aid) : 
+            warehouse(cartago.ArtifactId warehouseId) &
+            floorplan(cartago.ArtifactId fpId) {
+        try {
+            cartago.lookupArtifact(name, aid);
+        } recover {
+            cartago.makeArtifact(name, "artifacts.AccessPoint", cartago.params([]), aid);
+
+            // Install AP In Floorplan
+            cartago.linkArtifacts(aid, "out-fp", fpId);
+            cartago.operation(aid, install());
+
+            // Connect AP to Warehouse
+            cartago.linkArtifacts(aid, "out-1", warehouseId);
+        }
+        +accessPoint(name, aid);
+    }
+
+    plan +!available(string name, string type) :
+            accessPoint(name, cartago.ArtifactId aid) {
+        cartago.operation(aid, retrieve(type));
+        ?available(name, type);
+    }
+
+    plan +?available(string name, string type) :
+            accessPoint(name, cartago.ArtifactId aid) {
+        cartago.operation(aid, observeProperty("available", cartago.ArtifactObsProperty prop));
+        if (~pe.isBound(type)) {
+            type = pe.stringValue(prop);
+            cartago.println(type + " is available at access point: " + name);
+        } else if (type ~= pe.stringValue(prop))
+            S.fail();
+    }
+
+    //******************************************************************************************
+    // STORAGE POINT
+    //******************************************************************************************
+    plan +!storagePoint(string name, cartago.ArtifactId aid) : 
+            floorplan(cartago.ArtifactId fpId) {
+        try {
+            cartago.lookupArtifact(name, aid);
+        } recover {
+            cartago.makeArtifact(name, "artifacts.StoragePoint", cartago.params([]), aid);
+
+            // Install AP In Floorplan
+            cartago.linkArtifacts(aid, "out-fp", fpId);
+            cartago.operation(aid, install());
+        }
+        +storagePoint(name, aid);
+    }
+
+    plan +?available(string name, string type) :
+            storagePoint(name, cartago.ArtifactId aid) {
+        cartago.operation(aid, observeProperty("available", cartago.ArtifactObsProperty prop));
+        if (~pe.isBound(type)) {
+            type = pe.stringValue(prop);
+            cartago.println(type + " is available at storage point: " + name);
+        } else if (type ~= pe.stringValue(prop))
+            S.fail();
+    }
+
+    //******************************************************************************************
+    // PACKAGING POINT
+    //******************************************************************************************
+    plan +!packagingPoint(string name, cartago.ArtifactId aid) : 
+            floorplan(cartago.ArtifactId fpId) {
+        try {
+            cartago.lookupArtifact(name, aid);
+        } recover {
+            cartago.makeArtifact(name, "artifacts.PackagingPoint", cartago.params([]), aid);
+
+            // Install PP In Floorplan
+            cartago.linkArtifacts(aid, "out-fp", fpId);
+            cartago.operation(aid, install());
+        }
+
+        +packagingPoint(name, aid);
+    }
+
+    plan +?outstanding(string name, list items) :
+            packagingPoint(name, cartago.ArtifactId aid) {
+        cartago.operation(aid, observeProperty("outstanding", cartago.ArtifactObsProperty prop));
+        items = pe.listValues(prop);
+    }
+
+    plan +!deliver(string name) :
+            packagingPoint(name, cartago.ArtifactId aid) {
+        cartago.operation(aid, deliver());
+    }
+
+    //******************************************************************************************
+    // ORDERS
+    //******************************************************************************************
+    plan +!orders(cartago.ArtifactId aid) :
+            floorplan(cartago.ArtifactId fpId) {
+        try {
+            cartago.lookupArtifact("orders", aid);
+        } recover {
+            cartago.makeArtifact("orders", "artifacts.Orders", cartago.params([]), aid);
+
+            // Orders are shown in the Floorplan viewer
+            cartago.linkArtifacts(aid, "out-fp", fpId);
+        }
+        +orders(aid);
+    }
+
+    // Create count random orders for the given item types, chosen using seed. The first
+    // initialOrders exist straight away; the rest arrive about every meanInterval ms.
+    plan +!createOrders(list items, int count, long seed, int initialOrders, long meanInterval) :
+            orders(cartago.ArtifactId aid) {
+        cartago.operation(aid, configure(items, count, seed, initialOrders, meanInterval));
+    }
+
+    // Assign the next order to a packaging point; order is bound to its id
+    plan +!assign(string packagingPoint, string order) : orders(cartago.ArtifactId aid) {
+        cartago.operation(aid, assign(packagingPoint, order));
+        cartago.println(order + " is assigned to " + packagingPoint);
+    }
+
+    // The next order to be assigned (id is "none" if all orders have been assigned)
+    plan +?nextOrder(string id, string item, int quantity) : orders(cartago.ArtifactId aid) {
+        cartago.operation(aid, observeProperty("nextOrder", cartago.ArtifactObsProperty prop));
+        id = pe.stringValue(prop, 0);
+        item = pe.stringValue(prop, 1);
+        quantity = pe.intValue(prop, 2);
+    }
+
+    // The number of orders waiting to be assigned to a packaging point
+    plan +?outstandingOrders(int count) : orders(cartago.ArtifactId aid) {
+        cartago.operation(aid, observeProperty("outstandingOrders", cartago.ArtifactObsProperty prop));
+        count = pe.intValue(prop);
+    }
+
+    // The number of orders that have not arrived yet (with order arrivals on)
+    plan +?ordersToArrive(int count) : orders(cartago.ArtifactId aid) {
+        cartago.operation(aid, observeProperty("ordersToArrive", cartago.ArtifactObsProperty prop));
+        count = pe.intValue(prop);
+    }
+
+    // The number of orders assigned to packaging points but not yet delivered
+    plan +?assignedOrders(int count) : orders(cartago.ArtifactId aid) {
+        cartago.operation(aid, observeProperty("assignedOrders", cartago.ArtifactObsProperty prop));
+        count = pe.intValue(prop);
+    }
+
+    //******************************************************************************************
+    // ROBOT
+    //******************************************************************************************
+    plan +!robot(string name, cartago.ArtifactId rid) {
+        !robot(name, 800, rid);
+    }
+
+    plan +!robot(string name, int maxEnergy, cartago.ArtifactId rid) {
+        !robot(name, maxEnergy, 300, rid);
+    }
+
+    plan +!robot(string name, int maxEnergy, int chargeRate, cartago.ArtifactId rid) :
+            floorplan(cartago.ArtifactId fpId) {
+        try {
+            cartago.lookupArtifact(name, rid);
+            cartago.lookupArtifact(name+"-charger", cartago.ArtifactId rcId);
+            +chargePoint(name+"-charger", rcId);
+        } recover {
+            cartago.makeArtifact(name+"-charger", "artifacts.RobotChargePoint", cartago.params([maxEnergy, chargeRate]), cartago.ArtifactId rcId);
+            +chargePoint(name+"-charger", rcId);
+
+            // Install AP In Floorplan
+            cartago.linkArtifacts(rcId, "out-fp", fpId);
+            cartago.operation(rcId, install(name));
+
+            cartago.lookupArtifact(name, rid);
+            cartago.linkArtifacts(rid, "out-fp", fpId);
+
+            cartago.println(name + " CREATED");
+        }
+        +robot(name, rid);
+    }
+
+    plan +?at(string name, string location) :
+            robot(name, cartago.ArtifactId rid) {
+        cartago.operation(rid, observeProperty("at", cartago.ArtifactObsProperty prop));
+        if (~pe.isBound(location)) {
+            location = pe.stringValue(prop);
+            cartago.println(name + " is at location: " + location);
+        } else if (location ~= pe.stringValue(prop))
+            S.fail();
+    }
+
+    plan +!at(string name, string location) : at(name, location) { }
+
+    plan +!at(string name, string location) :
+            robot(name, cartago.ArtifactId rid) {
+        ?free(location);
+        cartago.operation(rid, move(location));
+    }
+
+    plan +!holding(string name, string item) : 
+            robot(name, cartago.ArtifactId rid) {
+        cartago.operation(rid, load());
+        ?holding(name, item);
+        cartago.println(name + " is holding " + item);
+    }
+
+    plan +?holding(string name, string item) :
+            robot(name, cartago.ArtifactId rid) {
+        cartago.operation(rid, observeProperty("holding", cartago.ArtifactObsProperty prop));
+        item = pe.stringValue(prop);
+    }
+
+    // Charge the robot until it is full. It must be at a charge point; each charging step adds
+    // that charge point's charge rate, so a slower charge point takes more steps.
+    plan +!charged(string name) :
+            robot(name, cartago.ArtifactId rid) {
+        cartago.operation(rid, observeProperty("maxEnergy", cartago.ArtifactObsProperty prop));
+        int maxEnergy = pe.intValue(prop);
+        ?chargeLevel(name, int level);
+        while (level < maxEnergy) {
+            cartago.operation(rid, charge());
+            ?chargeLevel(name, int newLevel);
+            level = newLevel;
+        }
+    }
+
+    // The robot's current charge level (its energy). If level is already bound, the query
+    // succeeds only when the robot has exactly that charge.
+    plan +?chargeLevel(string name, int level) :
+            robot(name, cartago.ArtifactId rid) {
+        cartago.operation(rid, observeProperty("energy", cartago.ArtifactObsProperty prop));
+        if (~pe.isBound(level)) {
+            level = pe.intValue(prop);
+        } else if (level ~= pe.intValue(prop))
+            S.fail();
+    }
+
+    plan +!empty(string name) : 
+            robot(name, cartago.ArtifactId rid) {
+        
+        ?holding(name, string item);
+
+        cartago.operation(rid, unload());
+        cartago.println(name + " is no longer holding " + item);
+    }
+
+    //******************************************************************************************
+    // WORKSTATION
+    //******************************************************************************************
+    plan +!workstation(string name, cartago.ArtifactId aid) :
+            floorplan(cartago.ArtifactId fpId) {
+        try {
+            cartago.lookupArtifact(name, aid);
+        } recover {
+            cartago.makeArtifact(name, "artifacts.Workstation", cartago.params([]), aid);
+
+            // Install AP In Floorplan
+            cartago.linkArtifacts(aid, "out-fp", fpId);
+            cartago.operation(aid, install());
+        }
+        +workstation(name, aid);
+    }
+
+    plan +!configure(string name, list inputs, string output, long duration) :
+            workstation(name, cartago.ArtifactId wid) {
+        
+        // DO ACTUAL CONFIGURATION HERE...
+        cartago.operation(wid, configure(inputs, output, duration));
+        cartago.println(name + " is configured (inputs: " + inputs + "; output: " + output + ")" );
+    }
+
+    plan +?inputsNeeded(string name, list inputs) :
+            workstation(name, cartago.ArtifactId wid) {
+        cartago.operation(wid, observeProperty("inputsNeeded", cartago.ArtifactObsProperty prop));
+        inputs = pe.listValues(prop);
+    }
+
+    plan +?state(string name, string state) :
+            workstation(name, cartago.ArtifactId wid) {
+        cartago.operation(wid, observeProperty("state", cartago.ArtifactObsProperty prop));
+        if (~pe.isBound(state))
+            state = pe.stringValue(prop);
+        else if (state ~= pe.stringValue(prop))
+            S.fail();
+    }
+
+    plan +!operate(string name) :
+            workstation(name, cartago.ArtifactId ws1Id) {
+        // Check workstation is in correct state...
+        ?state(name, "ready");
+
+        // Operate
+        cartago.operation(ws1Id, operate());
+
+        // Wait for operation to complete
+        //?state("ws1", string state);
+        ?state(name, string state);
+        while (state ~= "done") {
+            S.sleep(500);
+            //?state("ws1", string state2);
+            ?state(name, string state2);
+            state = state2;
+        }
+
+        //cartago.println("ws1 is: " + state);
+        cartago.println(name + " is: " + state);
+    }
+}

@@ -1,0 +1,33 @@
+// Sets up the simulation: asks the factory agent to build the factory described in a
+// configuration file and, once it has, creates the agent with the control strategy.
+agent Main extends core.Base {
+    plan +!main(list args) {
+        cartago.startService();
+    	cartago.link();
+
+        // The factory agent builds the simulation described in a configuration file.
+        // FIPA Request protocol: request -> agree / refuse -> inform (done) / failure
+        S.createAgent("factory", "core.Factory");
+        // EVALUATION SCENARIO (course project): change this path to select another config.
+        send(request, "factory", configure("config/easy-02-two-robots.json"));
+    }
+
+    plan @message(agree, string sender, configure(string file)) {
+        cartago.println(sender + " agreed to configure the factory from " + file);
+    }
+
+    plan @message(refuse, string sender, configure(string file)) {
+        cartago.println(sender + " refused to configure the factory from " + file);
+    }
+
+    plan @message(failure, string sender, configure(string file)) {
+        cartago.println(sender + " failed to configure the factory from " + file);
+    }
+
+    plan @message(inform, string sender, configured(string file)) {
+        cartago.println(sender + " has configured the factory from " + file);
+
+        // Start the control strateMyo try your own, replace BasicStrategy with your agent.
+        S.createAgent("strategy", "MyStrategy");
+    }
+}

@@ -1,0 +1,117 @@
+package core;
+
+agent Factory extends core.Base {
+    types factory {
+        formula factory(cartago.ArtifactId);
+        formula configuration(string);
+    }
+
+    initial !init();
+
+    plan +!init() {
+        cartago.link();
+    }
+
+    //******************************************************************************************
+    // FIPA REQUEST PROTOCOL: configure(file)
+    //******************************************************************************************
+    // Only one simulation can be configured, so refuse if this agent already has one (or is
+    // part way through building it).
+    plan @message(request, string sender, configure(string file)) : configuration(string current) {
+        cartago.println("refusing to configure from " + file + ": already configured from " + current);
+        send(refuse, sender, configure(file));
+    }
+
+    plan @message(request, string sender, configure(string file)) {
+        +configuration(file);
+        send(agree, sender, configure(file));
+
+        try {
+            !build(file);
+            send(inform, sender, configured(file));
+        } recover {
+            cartago.println("failed to configure the factory from " + file);
+            -configuration(file);
+            send(failure, sender, configure(file));
+        }
+    }
+
+    //******************************************************************************************
+    // BUILDING THE FACTORY
+    //******************************************************************************************
+    plan +!factory(cartago.ArtifactId fid) {
+        try {
+            cartago.lookupArtifact("factory", fid);
+        } recover {
+            cartago.makeArtifact("factory", "artifacts.Factory", cartago.params(["schema/factory.schema.json"]), fid);
+        }
+        +factory(fid);
+    }
+
+    // A list of names from the loaded configuration, e.g. "accessPoints" or "robots"
+    plan +?factoryList(string property, list values) : factory(cartago.ArtifactId fid) {
+        cartago.operation(fid, observeProperty(property, cartago.ArtifactObsProperty prop));
+        values = pe.listValues(prop);
+    }
+
+    plan +!build(string file) {
+        // Load and validate the configuration (fails if it is not valid)
+        !factory(cartago.ArtifactId fid);
+        cartago.operation(fid, load(file));
+        cartago.println("loaded factory configuration: " + file);
+
+        !floorplan(cartago.ArtifactId fpId);
+
+        // The scenario's description, random seed and options (travel distance, order
+        // arrivals and breakdowns) are given to the floorplan, which runs the simulation
+        cartago.operation(fid, scenario(string scenarioName, string description, long seed));
+        cartago.operation(fid, options(boolean travelDistance, boolean orderArrivals, int initialOrders,
+                long meanInterval, boolean breakdowns, double probability, long repairTime));
+        cartago.operation(fpId, configureScenario(scenarioName, description, seed, travelDistance,
+                orderArrivals, initialOrders, meanInterval, breakdowns, probability, repairTime));
+
+        !warehouse(cartago.ArtifactId wId);
+        ?factoryList("warehouse", list stock);
+        forall(string item : stock) {
+            cartago.operation(fid, stock(item, int quantity));
+            !addToWarehouse(item, quantity);
+        }
+
+        ?factoryList("accessPoints", list accessPoints);
+        forall(string name : accessPoints) {
+            !accessPoint(name, cartago.ArtifactId apId);
+        }
+
+        ?factoryList("storagePoints", list storagePoints);
+        forall(string name : storagePoints) {
+            !storagePoint(name, cartago.ArtifactId spId);
+        }
+
+        ?factoryList("packagingPoints", list packagingPoints);
+        forall(string name : packagingPoints) {
+            !packagingPoint(name, cartago.ArtifactId ppId);
+        }
+
+        !orders(cartago.ArtifactId oId);
+        ?factoryList("orderItems", list orderItems);
+        cartago.operation(fid, orderCount(int orderCount));
+        !createOrders(orderItems, orderCount, seed, initialOrders, meanInterval);
+
+        // Robots that have an agent class get an agent of the same name
+        ?factoryList("robots", list robots);
+        forall(string name : robots) {
+            cartago.operation(fid, robot(name, int maxEnergy, int chargeRate, string agentClass));
+            !robot(name, maxEnergy, chargeRate, cartago.ArtifactId rid);
+            if (agentClass ~= "none") {
+                S.createAgent(name, agentClass);
+            }
+        }
+
+        ?factoryList("workstations", list workstations);
+        forall(string name : workstations) {
+            cartago.operation(fid, workstation(name, list inputs, string output, long duration));
+            !workstation(name, cartago.ArtifactId wsId);
+            !configure(name, inputs, output, duration);
+        }
+    }
+}

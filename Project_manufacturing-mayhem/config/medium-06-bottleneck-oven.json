@@ -1,0 +1,74 @@
+{
+  "$schema": "../src/main/resources/schema/factory.schema.json",
+  "name": "Bottleneck oven",
+  "description": "A single slow workstation (15 s per pie) with three robots. Tests whether a strategy keeps the bottleneck supplied and emptied so it is never idle or blocked.",
+  "seed": 606,
+  "warehouse": {
+    "apples": 12,
+    "pastry": 12
+  },
+  "accessPoints": [
+    "ap1",
+    "ap2"
+  ],
+  "storagePoints": [
+    "sp1",
+    "sp2"
+  ],
+  "packagingPoints": [
+    "pp1",
+    "pp2"
+  ],
+  "workstations": [
+    {
+      "name": "ws1",
+      "inputs": [
+        "apples",
+        "pastry"
+      ],
+      "output": "apple-pie",
+      "duration": 15000
+    }
+  ],
+  "robots": [
+    {
+      "name": "r1",
+      "maxEnergy": 800,
+      "chargeRate": 300,
+      "agent": "Robot"
+    },
+    {
+      "name": "r2",
+      "maxEnergy": 800,
+      "chargeRate": 300,
+      "agent": "Robot"
+    },
+    {
+      "name": "r3",
+      "maxEnergy": 800,
+      "chargeRate": 300,
+      "agent": "Robot"
+    }
+  ],
+  "orders": {
+    "items": [
+      "apple-pie"
+    ],
+    "count": 6
+  },
+  "options": {
+    "travelDistance": {
+      "enabled": true
+    },
+    "orderArrivals": {
+      "enabled": false,
+      "initialOrders": 1,
+      "meanInterval": 30000
+    },
+    "breakdowns": {
+      "enabled": false,
+      "probability": 0.05,
+      "repairTime": 15000
+    }
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "$schema": "../src/main/resources/schema/factory.schema.json",
+  "name": "Two-stage recipe",
+  "description": "Dough is made from flour and water, then baked with apples into pies. Tests pipelining: making the next dough while a pie bakes, using storage as a buffer.",
+  "seed": 707,
+  "warehouse": {
+    "flour": 10,
+    "water": 10,
+    "apples": 10
+  },
+  "accessPoints": [
+    "ap1",
+    "ap2"
+  ],
+  "storagePoints": [
+    "sp1",
+    "sp2"
+  ],
+  "packagingPoints": [
+    "pp1",
+    "pp2"
+  ],
+  "workstations": [
+    {
+      "name": "mixer",
+      "inputs": [
+        "flour",
+        "water"
+      ],
+      "output": "dough",
+      "duration": 3000
+    },
+    {
+      "name": "oven",
+      "inputs": [
+        "dough",
+        "apples"
+      ],
+      "output": "apple-pie",
+      "duration": 5000
+    }
+  ],
+  "robots": [
+    {
+      "name": "r1",
+      "maxEnergy": 800,
+      "chargeRate": 300,
+      "agent": "Robot"
+    },
+    {
+      "name": "r2",
+      "maxEnergy": 800,
+      "chargeRate": 300,
+      "agent": "Robot"
+    },
+    {
+      "name": "r3",
+      "maxEnergy": 800,
+      "chargeRate": 300,
+      "agent": "Robot"
+    }
+  ],
+  "orders": {
+    "items": [
+      "apple-pie"
+    ],
+    "count": 5
+  },
+  "options": {
+    "travelDistance": {
+      "enabled": true
+    },
+    "orderArrivals": {
+      "enabled": false,
+      "initialOrders": 1,
+      "meanInterval": 30000
+    },
+    "breakdowns": {
+      "enabled": false,
+      "probability": 0.05,
+      "repairTime": 15000
+    }
+  }
+}

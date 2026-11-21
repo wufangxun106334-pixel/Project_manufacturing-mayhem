@@ -1,0 +1,202 @@
+// ============================================================================
+// MyStrategy.astra —— COMP41400 课程的协调策略（新版 core.Base 基线）
+//
+// 与 supplied code 的关系：
+//   * core.Base 提供"查工件 / 读属性 / 调操作"的计划库，本文件只写**协调**。
+//   * core.Factory 负责按 config/*.json 建好整个工厂；本 agent 只做 lookup，
+//     不再创建任何工件（旧版那套 !setup / 自造 zone 已作废）。
+//   * Robot.astra 是 supplied 的搬运控制器；本文件通过 request/inform 驱动它，
+//     并额外处理 failure 回执（supplied 版本没有，见文件末尾说明）。
+//
+// 设计要点（对应报告里的 coordination mechanism）：
+//   1) 场景发现：直接观察 factory 工件的 observable lists，不写死任何 zone/机器名
+//   2) 任务分配：idle(r) 信念集合，取一个就立刻 -idle(r)，避免重复派工
+//   3) 订单闭环：!assign → 按 outstanding 生产 → !deliver
+//   4) 共享资源：移动前 Base 的 !at 会做 ?free 检查（occupancy only，见局限）
+//   5) 充电：完全交给 core.Base 的 !charged（按充电点 chargeRate 充到满）
+// ============================================================================
+agent MyStrategy extends core.Base {
+
+    // ------------------------------------------------------------------------
+    // 本 agent 私有信念
+    //   configList(属性名, 名字列表)  —— 从 Factory 工件读到的场景清单
+    //   idle(机器人名)                —— 当前可接单的机器人（取走即删除）
+    //   failed(来源, 目的)            —— 机器人搬运失败的回执
+    // ------------------------------------------------------------------------
+    types strategy {
+        formula configList(string, list);
+        formula idle(string);
+        formula failed(string, string);
+    }
+
+    initial !start();
+
+    // ========================================================================
+    // [1] 启动：找工件 → 发现场景 → 登记空闲机器人 → 进入订单循环
+    // ========================================================================
+    plan +!start() {
+        cartago.link();
+
+        // lookup（Factory 已经建好了，这里不会新建任何东西）
+        !floorplan(cartago.ArtifactId _);
+        !warehouse(cartago.ArtifactId _);
+        !orders(cartago.ArtifactId _);
+
+        !loadConfig();
+
+        // 每个机器人先登记为空闲；机器人 agent 由 Factory 按 JSON 的 agent 字段创建
+        ?configList("robots", list robots);
+        forall (string r : robots) {
+            !robot(r, cartago.ArtifactId _);
+            +idle(r);
+        }
+        cartago.println("[S] idle robots = " + robots);
+
+        !fulfilOrders();
+    }
+
+    // 读场景清单：factory 工件的 observable list 就是配置里的名字列表。
+    // 这样换 scenario（easy-02 / medium-05 …）不用改一行策略代码。
+    plan +!loadConfig() {
+        cartago.lookupArtifact("factory", cartago.ArtifactId fid);
+
+        cartago.operation(fid, observeProperty("warehouse", cartago.ArtifactObsProperty p1));
+        +configList("warehouse", pe.listValues(p1));
+
+        cartago.operation(fid, observeProperty("accessPoints", cartago.ArtifactObsProperty p2));
+        +configList("accessPoints", pe.listValues(p2));
+
+        cartago.operation(fid, observeProperty("storagePoints", cartago.ArtifactObsProperty p3));
+        +configList("storagePoints", pe.listValues(p3));
+
+        cartago.operation(fid, observeProperty("packagingPoints", cartago.ArtifactObsProperty p4));
+        +configList("packagingPoints", pe.listValues(p4));
+
+        cartago.operation(fid, observeProperty("workstations", cartago.ArtifactObsProperty p5));
+        +configList("workstations", pe.listValues(p5));
+
+        cartago.operation(fid, observeProperty("robots", cartago.ArtifactObsProperty p6));
+        +configList("robots", pe.listValues(p6));
+
+        cartago.println("[S] accessPoints = " + pe.listValues(p2));
+        cartago.println("[S] packagingPoints = " + pe.listValues(p4));
+        cartago.println("[S] workstations = " + pe.listValues(p5));
+        cartago.println("[S] robots = " + pe.listValues(p6));
+    }
+
+    plan +?configList(string property, list values) : configList(property, values) { }
+
+    // ========================================================================
+    // [2] 订单主循环
+    //   新版 Orders 工件自己管队列，策略只负责"取一张 → 做完 → 再取"。
+    //   waiting 为 0 但 coming > 0 时说明订单还没到（orderArrivals 打开的场景），
+    //   此时轮询等待，而不是提前宣布结束。
+    // ========================================================================
+    plan +!fulfilOrders() {
+        ?outstandingOrders(int waiting);
+        ?ordersToArrive(int coming);
+        int remaining = waiting + coming;
+        cartago.println("[S] orders to do = " + remaining);
+
+        while (remaining > 0) {
+            if (waiting == 0) {
+                S.sleep(1000);
+            } else {
+                !fulfilOne();
+            }
+            ?outstandingOrders(int w2);
+            ?ordersToArrive(int c2);
+            waiting = w2;
+            remaining = w2 + c2;
+        }
+        cartago.println("[S] all orders delivered");
+    }
+
+    // 完成一张订单：分配到 pp → 一直生产到 outstanding 为空 → deliver
+    plan +!fulfilOne() : configList("packagingPoints", list pps) {
+        string pp = P.headAsString(pps);
+        !packagingPoint(pp, cartago.ArtifactId _);
+
+        !assign(pp, string orderId);
+        cartago.println("[S] order " + orderId + " assigned to " + pp);
+
+        !produceAll(pp);
+
+        !deliver(pp);
+        cartago.println("[S] order " + orderId + " delivered at " + pp);
+    }
+
+    // outstanding 是"还没到位的零件"清单；为空表示 pp 已经凑齐
+    plan +!produceAll(string pp) {
+        ?outstanding(pp, list needed);
+        while (P.size(needed) > 0) {
+            !produceOne(pp);
+            ?outstanding(pp, list needed2);
+            needed = needed2;
+        }
+    }
+
+    // 生产一件成品：按 inputsNeeded 取料 → operate → 取走产物送 pp
+    plan +!produceOne(string pp) :
+            configList("workstations", list wss) & configList("accessPoints", list aps) {
+        string ws = P.headAsString(wss);
+        string ap = P.headAsString(aps);
+        !workstation(ws, cartago.ArtifactId _);
+        !accessPoint(ap, cartago.ArtifactId _);
+
+        // ① 缺什么取什么（inputsNeeded 由工件维护）
+        ?inputsNeeded(ws, list missing);
+        while (P.size(missing) > 0) {
+            string item = P.headAsString(missing);
+
+            ?idle(string r);
+            -idle(r);
+            !available(ap, item);
+            !transfer(r, ap, ws);
+            +idle(r);
+            ?inputsNeeded(ws, list missing2);
+            missing = missing2;
+        }
+
+        // ② 生产（Base 的 !operate 内部轮询到 done）
+        !operate(ws);
+
+        ?idle(string r);
+        -idle(r);
+        !transfer(r, ws, pp);
+        +idle(r);
+    }
+
+    // 查询：任选一个空闲机器人。
+    // ★ ASTRA 的 guard（: 后面的条件）只做判断、**不绑定变量**；
+    //   要让 r 被绑定必须用查询计划 ?，所以这里写成 +?idle。
+    plan +?idle(string r) : idle(r) { }
+
+    // ========================================================================
+    // [3] 搬运协议：request → (confirm | failure)
+    //   相对 supplied BasicStrategy 的唯一增强：同时等待 transferred 与 failed，
+    //   失败时让当前任务失败，而不是永久阻塞在 wait 上。
+    // ========================================================================
+    plan +!transfer(string name, string from, string to) {
+        send(request, name, transfer(from, to));
+        wait(transferred(from, to) | failed(from, to));
+
+        if (failed(from, to)) {
+            -failed(from, to);
+            -transferred(from, to);
+            cartago.println("[S] transfer " + from + " -> " + to + " by " + name + " FAILED");
+            S.fail();
+        } else {
+            -transferred(from, to);
+        }
+    }
+
+    plan @message(inform, string sender, transferred(string from, string to)) {
+        +transferred(from, to);
+    }
+
+    plan @message(failure, string sender, transfer(string from, string to)) {
+        cartago.println("[S] " + sender + " reported failure: " + from + " -> " + to);
+        +failed(from, to);
+    }
+}

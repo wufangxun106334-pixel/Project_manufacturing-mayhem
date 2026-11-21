@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Manufacturing Mayhem factory configuration",
+  "description": "Describes a factory: the warehouse stock, the locations on the floor, the robots and the orders customers can place. Every location and robot name must be unique across the whole file, because they share one floorplan.",
+  "type": "object",
+  "required": ["warehouse", "accessPoints", "packagingPoints", "workstations", "robots", "orders"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "description": "Lets editors find this schema.",
+      "type": "string"
+    },
+    "name": {
+      "description": "A label for the configuration.",
+      "type": "string"
+    },
+    "description": {
+      "description": "A short description of the scenario: what it tests and what makes it hard.",
+      "type": "string"
+    },
+    "seed": {
+      "description": "Seeds the random choices (the orders, when dynamic orders arrive, breakdowns) so a run can be repeated. If it is left out, a seed is chosen and reported in the run summary.",
+      "type": "integer"
+    },
+    "options": { "$ref": "#/$defs/options" },
+    "warehouse": {
+      "description": "Starting stock: item type -> quantity. Access points retrieve items from here.",
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "accessPoints": {
+      "description": "Where items from the warehouse are made available to robots.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/name" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "storagePoints": {
+      "description": "Places where a robot can leave an item for later.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/name" },
+      "uniqueItems": true,
+      "default": []
+    },
+    "packagingPoints": {
+      "description": "Where orders are collected and delivered.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/name" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "workstations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/workstation" },
+      "minItems": 1
+    },
+    "robots": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/robot" },
+      "minItems": 1
+    },
+    "orders": { "$ref": "#/$defs/orders" }
+  },
+  "$defs": {
+    "options": {
+      "description": "Optional features. Each can be switched off with \"enabled\": false while keeping its settings.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "travelDistance": {
+          "description": "Moves take longer and use more energy the further the robot travels (1 s and 25 energy per unit of distance). When off, every move takes 4 s and 100 energy.",
+          "type": "object",
+          "required": ["enabled"],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" }
+          }
+        },
+        "orderArrivals": {
+          "description": "Orders arrive during the run instead of all existing at the start.",
+          "type": "object",
+          "required": ["enabled", "initialOrders", "meanInterval"],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "initialOrders": {
+              "description": "How many orders exist at the start.",
+              "type": "integer",
+              "minimum": 1
+            },
+            "meanInterval": {
+              "description": "The average time between arrivals, in milliseconds. Each gap is chosen between half and one and a half times this.",
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "breakdowns": {
+          "description": "Robots (when moving, loading or unloading) and workstations (when operating) sometimes break down and are out of action until repaired, after which the operation completes.",
+          "type": "object",
+          "required": ["enabled", "probability", "repairTime"],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "probability": {
+              "description": "The chance that any one operation breaks down.",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "repairTime": {
+              "description": "How long a breakdown lasts, in milliseconds.",
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      }
+    },
+    "name": {
+      "description": "A location or robot name. The suffix -charger is reserved for each robot's charge point.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "not": { "pattern": "-charger$" }
+    },
+    "workstation": {
+      "type": "object",
+      "required": ["name", "inputs", "output", "duration"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "inputs": {
+          "description": "The items consumed to make one output. Repeat an item to need more than one of it.",
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "output": {
+          "description": "The item produced.",
+          "type": "string"
+        },
+        "duration": {
+          "description": "How long one operation takes, in milliseconds.",
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "robot": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "maxEnergy": {
+          "description": "The robot's battery capacity. It starts full, at its charge point <name>-charger.",
+          "type": "integer",
+          "minimum": 1,
+          "default": 800
+        },
+        "chargeRate": {
+          "description": "How much energy one charging step at the robot's charge point adds. A robot charges until it is full, so a lower rate means more steps.",
+          "type": "integer",
+          "minimum": 1,
+          "default": 300
+        },
+        "agent": {
+          "description": "The ASTRA agent class that controls this robot. Leave it out for a robot with no agent.",
+          "type": "string"
+        }
+      }
+    },
+    "orders": {
+      "type": "object",
+      "required": ["items", "count"],
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "description": "The item types a customer can order.",
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "count": {
+          "description": "How many random orders to create. They are assigned to packaging points in the order they were created.",
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

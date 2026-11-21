@@ -1,0 +1,90 @@
+{
+  "$schema": "../src/main/resources/schema/factory.schema.json",
+  "name": "Scale out",
+  "description": "Four robots and two identical workstations with ten orders. Tests whether a strategy runs work in parallel; compare its makespan with the two-robot scenarios.",
+  "seed": 505,
+  "warehouse": {
+    "apples": 20,
+    "pastry": 20
+  },
+  "accessPoints": [
+    "ap1",
+    "ap2"
+  ],
+  "storagePoints": [
+    "sp1",
+    "sp2"
+  ],
+  "packagingPoints": [
+    "pp1",
+    "pp2",
+    "pp3"
+  ],
+  "workstations": [
+    {
+      "name": "ws1",
+      "inputs": [
+        "apples",
+        "pastry"
+      ],
+      "output": "apple-pie",
+      "duration": 2000
+    },
+    {
+      "name": "ws2",
+      "inputs": [
+        "apples",
+        "pastry"
+      ],
+      "output": "apple-pie",
+      "duration": 2000
+    }
+  ],
+  "robots": [
+    {
+      "name": "r1",
+      "maxEnergy": 800,
+      "chargeRate": 300,
+      "agent": "Robot"
+    },
+    {
+      "name": "r2",
+      "maxEnergy": 800,
+      "chargeRate": 300,
+      "agent": "Robot"
+    },
+    {
+      "name": "r3",
+      "maxEnergy": 800,
+      "chargeRate": 300,
+      "agent": "Robot"
+    },
+    {
+      "name": "r4",
+      "maxEnergy": 800,
+      "chargeRate": 300,
+      "agent": "Robot"
+    }
+  ],
+  "orders": {
+    "items": [
+      "apple-pie"
+    ],
+    "count": 10
+  },
+  "options": {
+    "travelDistance": {
+      "enabled": true
+    },
+    "orderArrivals": {
+      "enabled": false,
+      "initialOrders": 1,
+      "meanInterval": 30000
+    },
+    "breakdowns": {
+      "enabled": false,
+      "probability": 0.05,
+      "repairTime": 15000
+    }
+  }
+}

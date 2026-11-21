@@ -1,0 +1,82 @@
+{
+  "$schema": "../src/main/resources/schema/factory.schema.json",
+  "name": "Tight energy",
+  "description": "Small batteries and slow chargers, with travel distance on. Tests charging decisions: charging only when needed, but never so late that a robot is stranded.",
+  "seed": 909,
+  "warehouse": {
+    "apples": 12,
+    "pastry": 12
+  },
+  "accessPoints": [
+    "ap1",
+    "ap2"
+  ],
+  "storagePoints": [
+    "sp1"
+  ],
+  "packagingPoints": [
+    "pp1",
+    "pp2"
+  ],
+  "workstations": [
+    {
+      "name": "ws1",
+      "inputs": [
+        "apples",
+        "pastry"
+      ],
+      "output": "apple-pie",
+      "duration": 2000
+    },
+    {
+      "name": "ws2",
+      "inputs": [
+        "apples",
+        "pastry"
+      ],
+      "output": "apple-pie",
+      "duration": 2000
+    }
+  ],
+  "robots": [
+    {
+      "name": "r1",
+      "maxEnergy": 650,
+      "chargeRate": 75,
+      "agent": "Robot"
+    },
+    {
+      "name": "r2",
+      "maxEnergy": 650,
+      "chargeRate": 75,
+      "agent": "Robot"
+    },
+    {
+      "name": "r3",
+      "maxEnergy": 650,
+      "chargeRate": 75,
+      "agent": "Robot"
+    }
+  ],
+  "orders": {
+    "items": [
+      "apple-pie"
+    ],
+    "count": 6
+  },
+  "options": {
+    "travelDistance": {
+      "enabled": true
+    },
+    "orderArrivals": {
+      "enabled": false,
+      "initialOrders": 1,
+      "meanInterval": 30000
+    },
+    "breakdowns": {
+      "enabled": false,
+      "probability": 0.05,
+      "repairTime": 15000
+    }
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "$schema": "../src/main/resources/schema/factory.schema.json",
+  "name": "Steady arrivals",
+  "description": "Orders arrive over time instead of all at the start. Tests whether a strategy keeps up with demand and uses the quiet periods well.",
+  "seed": 404,
+  "warehouse": {
+    "apples": 12,
+    "pastry": 12
+  },
+  "accessPoints": [
+    "ap1",
+    "ap2"
+  ],
+  "storagePoints": [
+    "sp1"
+  ],
+  "packagingPoints": [
+    "pp1",
+    "pp2"
+  ],
+  "workstations": [
+    {
+      "name": "ws1",
+      "inputs": [
+        "apples",
+        "pastry"
+      ],
+      "output": "apple-pie",
+      "duration": 2000
+    }
+  ],
+  "robots": [
+    {
+      "name": "r1",
+      "maxEnergy": 800,
+      "chargeRate": 300,
+      "agent": "Robot"
+    },
+    {
+      "name": "r2",
+      "maxEnergy": 800,
+      "chargeRate": 300,
+      "agent": "Robot"
+    }
+  ],
+  "orders": {
+    "items": [
+      "apple-pie"
+    ],
+    "count": 6
+  },
+  "options": {
+    "travelDistance": {
+      "enabled": false
+    },
+    "orderArrivals": {
+      "enabled": true,
+      "initialOrders": 2,
+      "meanInterval": 40000
+    },
+    "breakdowns": {
+      "enabled": false,
+      "probability": 0.05,
+      "repairTime": 15000
+    }
+  }
+}
