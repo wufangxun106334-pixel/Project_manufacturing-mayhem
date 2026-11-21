@@ -1,0 +1,35 @@
+sequenceDiagram
+    autonumber
+    participant C as MyStrategy
+    participant O as Orders
+    participant A as ap1 / ap2
+    participant R1 as MyRobot r1
+    participant R2 as MyRobot r2
+    participant W as ws1
+    participant P as pp1
+
+    C->>O: assign(pp1) → order-1
+    C->>P: ?outstanding → [apple-pie]
+    C->>W: ?inputsNeeded → [apples, pastry]
+    par parallel fetch (distinct access points)
+        C->>A: retrieve(apples) @ap1
+        C->>R1: request transfer(t1, ap1, ws1)
+    and
+        C->>A: retrieve(pastry) @ap2
+        C->>R2: request transfer(t2, ap2, ws1)
+    end
+    R1->>W: move, load @ap1, move, unload @ws1 (0–12 s)
+    R1-->>C: inform delivered(t1)
+    R2->>W: move, load @ap2, move (retry until r1 leaves ws1 at 12 s), unload @ws1 (≈18 s)
+    R1-->>C: inform transferred(t1) — back at charger ≈16 s, energy 400 ≥ 400, no charge
+    R2-->>C: inform delivered(t2)
+    Note over C: barrier passed → operate(ws1)
+    C->>W: operate() … state = done (≈20 s)
+    Note over C: r1 already released by transferred(t1)<br/>(if every robot were busy, ?freeRobot would wait)
+    C->>R1: request transfer(t3, ws1, pp1)
+    Note over C: does not wait → assigns order-2 to pp2
+    R2-->>C: inform transferred(t2) — parked, no charge
+    R1->>P: move, load @ws1, move, unload @pp1
+    R1-->>C: inform delivered(t3)
+    C->>P: ?outstanding = [] → deliver()
+    R1-->>C: inform transferred(t3) — energy 0 < 400 → charged first

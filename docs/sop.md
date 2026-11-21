@@ -18,9 +18,11 @@ updated: 2026-11-21
 # Project：Manufacturing Mayhem（从零开始 SOP）
 
 > 来源：`COMP41400 Manufacturing Mayhem Project.pdf`（12 页，Deadline 2026-11-29）｜ 官方仓库：`gitlab.com/astra-language/examples/cartago/manufacturing-mayhem`（2026-11-21 的 `main` 是 `c77c249`，ASTRA 2.7.12）
-> 配套笔记：[Project-ManufacturingMayhem-参考代码](Project-ManufacturingMayhem-参考代码.md) ｜ [Project-ManufacturingMayhem-设计图](Project-ManufacturingMayhem-设计图.md) ｜ [Project-ManufacturingMayhem-报告草稿](Project-ManufacturingMayhem-报告草稿.md) ｜ [Project-ManufacturingMayhem-Demo讲解稿](Project-ManufacturingMayhem-Demo讲解稿.md) ｜ `COMP40040-Project-ManufacturingMayhem-解读`（Obsidian 笔记）
+> 配套笔记：[Project-ManufacturingMayhem-参考代码](参考代码.md) ｜ [Project-ManufacturingMayhem-设计图](设计图.md) ｜ [Project-ManufacturingMayhem-报告草稿](报告草稿.md) ｜ [Project-ManufacturingMayhem-Demo讲解稿](讲解稿.md) ｜ `COMP40040-Project-ManufacturingMayhem-解读`（Obsidian 笔记）
 > 相关课程：`Week7-Coordination-CNP与ASTRA实现-逐页讲解`（Obsidian 笔记） ｜ `Week9-Organisations-知识点`（Obsidian 笔记） ｜ `Lab4-VacWorld-SOP`（Obsidian 笔记）
 > ⚠️ 预期结果有两类来源：按 PDF 的 timing 规则手推；或者来自参考代码在临时副本里的一次 easy-02 **短跑**（smoke test，没跑到 Summary）。其余步骤没有实际运行。
+
+> ⚠️ 参考代码.md 里的完整代码是修订前的版本（没有 task id，充电固定 400）。实现时以本 SOP 和设计图为准，参考代码只看结构。
 
 **主线**：在官方搭好的 CArtAgO 工厂里，只写 agent（一个 coordinator 加上每个 robot 一个 controller），协调多个 robot 完成「access point 取原料 → workstation 生产 → packaging point → deliver」。评分重点是 **organisation 和 coordination 的设计是否合理、实现和 evaluation 证据是否对得上**；速度只是辅助证据。
 
@@ -52,9 +54,9 @@ mvn compile astra:deploy
 **SOP**
 1. 选 organisation：**central coordinator**（一个 `MyStrategy` 加上 N 个 `MyRobot`）。理由：环境状态集中在 artifact 里，coordinator 能看到全局，task allocation 简单，也能避免重复分配。PDF 明确说 central coordinator 是合法选择，只要说清楚 trade-off。
 2. 确定各角色的职责边界：coordinator 管「做什么、派给谁」；MyRobot 管「怎么走、什么时候充电」；artifact 管「什么操作合法」。
-3. 确定通信协议：`request transfer(from,to)` → `inform delivered(from,to)`（已卸货）→ `inform transferred(from,to)`（已回到停车位，可以接新任务）；失败时回 `failure transfer(from,to)`。
-4. 画架构图和 sequence diagram → 见 [Project-ManufacturingMayhem-设计图](Project-ManufacturingMayhem-设计图.md)。
-5. 写约 1000 词的报告 → 见 [Project-ManufacturingMayhem-报告草稿](Project-ManufacturingMayhem-报告草稿.md)，至少讨论一个 alternative（比如 Contract Net 或 decentralised robots）。
+3. 确定通信协议：`request transfer(id, from, to)` → `inform delivered(id)`（已卸货）→ `inform transferred(id)`（已回到停车位，可以接新任务）；失败时回 `failure transfer(id, from, to)`。`id` 是 coordinator 生成的唯一 task id（PDF 要求并发设计要用 robot + task id 来配对请求和回复）。
+4. 画架构图和 sequence diagram → 见 [Project-ManufacturingMayhem-设计图](设计图.md)。
+5. 写约 1000 词的报告 → 见 [Project-ManufacturingMayhem-报告草稿](报告草稿.md)，至少讨论一个 alternative（比如 Contract Net 或 decentralised robots）。
 
 **预期结果**：一份 report，覆盖 PDF 要求的 5 节：organisation、coordination、operational decisions、worked example、rationale 和 evaluation plan。
 
@@ -81,16 +83,19 @@ mvn compile astra:deploy
 ## Part 3 — Robot controller（MyRobot）
 **SOP**
 1. 把 supplied `Robot.astra` **复制**成 `MyRobot.astra`，原文件不改。
-2. 处理 `request transfer(from,to)`：`!go(from)` → `!holding` → `!go(to)` → `!empty` → 回 `delivered` → `!go(<name>-charger)` → `!topUp()` → 回 `transferred`。整段包在 `try/recover` 里，失败时回 `failure`。
-3. `!go(loc)`：调用 `!at` 失败时，`sleep` 250 ms 后重试，最多 40 次。原因是 `?free` 只检查当前状态，不做 reservation。
-4. `!topUp()`：电量低于 400 才充满电。400 的推导：从 charger 出发完成一次 transfer 的最坏消耗（3 次 move × 100 + load/unload 2 × 50，load 和 unload 开始前都要求电量 ≥ 100）。
+2. 处理 `request transfer(id, from, to)`：`!go(from)` → `!holding` → `!go(to)` → `!empty` → 回 `delivered(id)` → `!go(<name>-charger)` → `!topUp()` → 回 `transferred(id)`。整段（包括回 charger 和充电）都包在 `try/recover` 里，失败时回 `failure transfer(id, from, to)`。失败后 robot 停在原地，手里的 item 不会恢复，这一点要写进 limitations。
+3. `!go(loc)`：调用 `!at` 失败时，`sleep` 250 ms 后重试，最多 40 次。原因是 `?free` 只检查当前状态，不做 reservation。三段 move 都走 `!go`；最常冲突的是**去 ws 的那一段**（两个 robot 同时送料）。
+4. `!topUp()`：电量低于 **reserve** 才充满电。reserve 分两种情况：
+   - 先 `cartago.lookupArtifact("factory", cartago.ArtifactId fid)`（`core.Base` 没有封装 `!factory`），再   - 启动时用 `cartago.operation(fid, options(boolean td, boolean oa, int io, long mi, boolean bd, double p, long rt))` 读出 `travelDistance`（写法和 `core/Factory.astra` 第 68 行一样）。
+   - **td 关闭**（easy-01/02/04）：reserve = 400，也就是从 charger 出发一次 transfer 的最坏消耗（3 次 move × 100 + load/unload 2 × 50，load 和 unload 开始前都要求电量 ≥ 100）。
+   - **td 开启**（easy-03、全部 medium、hard）：move 耗电 = 25 × 距离，但 agent **查不到距离**（Floorplan 只提供 `isOccupied`）。所以改为实测：每趟记录「出发电量 − 回到 charger 时的电量」，reserve = min(历史最大值 + 50, maxEnergy)。还没测过任何一趟时，每次都充满再出发。**风险**：如果第一趟恰好是短途（比如耗电 350，reserve 变成 400），剩 450 就会跳过充电；下一趟如果是长途，就可能半路没电。这一点要写进 limitations，也是 reflection 的好素材；可选的缓解办法是让 coordinator 在 request 里附上任务类型（ap→ws 还是 ws→pp），robot 按类型分别记录实测值。
 5. 复制一份带说明的 config：
    ```bash
    sed 's/"agent": "Robot"/"agent": "MyRobot"/' config/easy-02-two-robots.json > config/easy-02-two-robots-myrobot.json
    ```
    只改 `agent` 字段，其余资源、stock、seed、options 都保持原样，并在 README 里 disclose。
 
-**预期结果**（travelDistance 关闭时）：一次 transfer 耗时 3 × 4 s + 2 × 2 s = **16 s**，耗电 $3\times100+2\times50=400$。800 电量的 robot 跑完 2 次才需要充一次电；在短跑里看到的正是 `energy 0 < 400, charging`。
+**预期结果**（travelDistance 关闭时）：一次 transfer 耗时 3 × 4 s + 2 × 2 s = **16 s**，耗电 $3\times100+2\times50=400$。800 电量的 robot 第一趟后剩 400，不充电；第二趟后剩 0，充电。短跑里看到的正是 `energy 0 < 400, charging`。td 开启时，第一趟一定是满电出发，之后每次在 log 里打印出 reserve 的值。
 
 **考察知识点**
 - 每个 robot 只受一个 controller 控制（PDF 明确要求）
@@ -113,11 +118,11 @@ mvn compile astra:deploy
 
 ## Part 5 — 并行与 pipelining（核心 coordination）
 **SOP**
-1. **robot 分配**：`?freeRobot(string r)` 找第一个不在 `busy(r)` 里的 robot，找不到就 `sleep` 后重试。选中后先 `+busy(r)`，再 `send`；收到 `transferred` 时 `-busy(r)`。
-2. **并行取料**：对每个缺的 input，各分一个不同的 access point（用 `usedAp(ap)` 标记）和一个 robot，所有请求一起发出。然后做 barrier，等这一批全部完成：`wait(arrived(ap, ws) | failedT(ap, ws))`。
+1. **robot 分配**：`?freeRobot(string r)` 找第一个不在 `busy(r)` 里的 robot，找不到就 `sleep` 后重试。选中后先 `+busy(r)`，再 `send`；收到 `transferred(id)` **或 `failure`** 时都要 `-busy(sender)`，并删除 `task(id, …)`，否则 robot 失败一次就会永远处于 busy。注意：robot 要回到 charger 才会被释放。在 easy-02 里，先送到 ws1 的 robot 大约 16 s 就回来了，早于 operate 完成（≈20 s），所以派送成品时不用等；只有所有 robot 都还在忙时，`?freeRobot` 才会等待（见设计图 图 2）。另外，`Floorplan.move` 出发时就会占住目标位置，所以两个 robot 同时去 ws1 时，后出发的那个会一直重试到前一个离开。
+2. **并行取料**：对每个缺的 input，各分一个不同的 access point（用 `usedAp(ap)` 标记）和一个 robot，所有请求一起发出。然后做 barrier：记下这一批发出的 task id，对每个 id 执行 `wait(arrived(id) | failedT(id))`，完成后删除对应标记（`delivered(id)` handler 里 `+arrived(id)`，failure handler 里 `+failedT(id)`）。
 3. **跨订单 pipelining**：每个 packaging point 用 `busyPP(pp)` 标记是否被占用。`ws → pp` 的 transfer **不等它完成**，主循环直接接下一单。在 `delivered` 的 message handler 里，如果 `outstanding` 已经为空，就调用 `!deliver(pp)`，然后 `-busyPP(pp)`。
 4. `!operate` 之前加 `!waitReady(ws)`，因为上一件产品可能还没被取走。
-5. 回复靠 `(from, to)` 配对：input transfer 的 `(ap, ws)` 组合每次都不同，所以不会混；`ws → pp` 的回复不需要配对。
+5. **task id**：用一个计数器 belief 生成 `t1, t2, …`，发请求时记下 `task(id, robot, from, to)`，回复按 id 处理，处理完删除。不要只靠 `(from, to)` 配对：同一张 2 件的订单（如 easy-02 的 order-4 = 2 × apple-pie）会连续发出两次 `ws1 → pp1`，key 相同；失败重试后，同一路径的旧标记也会残留。
 
 **预期结果**（参考代码短跑，easy-02）：log 里 `r1: ap1 -> ws1` 和 `r2: ap2 -> ws1` 同时发出；pp1 和 pp2 交替接单；4 张订单的 ASSIGNED 时间点分别是 0 s / 20 s / 53 s / 83 s（order-4 是 2 × apple-pie），比串行版快很多。
 
@@ -140,8 +145,9 @@ mvn compile astra:deploy
 
 ## Part 7 — 选一个 medium scenario
 **SOP**
-1. 推荐选 **medium-09-tight-energy**：小电池、慢充电，正好检验 Part 3 的 `topUp` 规则。如果 maxEnergy < 400，要改成「先充满再出发」并在报告里说明。备选是 medium-06-bottleneck-oven（检验 `waitReady` 和 pipelining）。
-2. 不支持的 scenario 如实写进 limitations：medium-07（两级 recipe，需要 storage buffer）、medium-08（多产品）、hard-11/12（breakdowns、stock 不足）。
+1. **注意：所有 medium 都开启了 travelDistance**，所以 Part 3 的两种 reserve 必须都实现，固定 400 在 medium 里会让 robot 半路没电。
+2. 推荐选 **medium-09-tight-energy**（`maxEnergy` 650、`chargeRate` 75、travelDistance 开启）：专门用来检验实测 reserve 的效果。预计 reserve 会接近 maxEnergy，也就是几乎每趟都充满；在报告里把这个现象当作证据来解释。备选是 medium-06-bottleneck-oven（检验 `waitReady` 和 pipelining，同样需要实测 reserve）。
+3. 不支持的 scenario 如实写进 limitations：medium-07（两级 recipe，需要 storage buffer）、hard-11/12（breakdowns、stock 不足）。medium-08 的三个 product 都是单级 recipe（ws1 apple-pie、ws2 cake、ws3 bread，各 3 个 ap/robot/pp），靠 `makes(ws, product)` **理论上能跑通，但没测过**；它的局限是同一时间只推进一张订单，不会让多台 ws 同时生产（medium-05 也受这个影响）。
 
 **预期结果**：选定的 medium scenario 能跑完并生成 Summary；跑不完也要记录卡在哪里。
 
@@ -166,7 +172,7 @@ mvn compile astra:deploy
 **SOP**
 1. **README**：prerequisites、build/run 命令、怎么选 strategy 和 scenario、哪些代码是自己写的或改的（`MyStrategy`、`MyRobot`、`*-myrobot.json`、`Main.astra` 那两行）、known limitations、evaluation 摘要。
 2. **Reflection 500–750 词**：遇到的挑战（guard 绑定、`done` keyword、location 冲突）、实现和 week 10 设计的差异、evaluation 显示的优缺点、**LLM 的使用方式和你怎么核对它的输出**。
-3. **Video 3–5 分钟** → 讲解稿见 [Project-ManufacturingMayhem-Demo讲解稿](Project-ManufacturingMayhem-Demo讲解稿.md)。
+3. **Video 3–5 分钟** → 讲解稿见 [Project-ManufacturingMayhem-Demo讲解稿](讲解稿.md)。
 
 **预期结果**：PDF week 12 checklist 上的每一项都有对应文件。
 
@@ -189,5 +195,9 @@ mvn compile astra:deploy
 | 送到最后一件就以为订单完成 | 必须显式调用 `!deliver(pp)` |
 | 只看 `outstandingOrders == 0` 就结束 | easy-04 会提前退出，还要加上 `ordersToArrive` 和 `assignedOrders` |
 | 原地改 supplied `Robot.astra` 或 scenario | 和 baseline 比就不公平了，改成复制 controller 和 config，并 disclose |
+| 在 travelDistance 开启的 scenario 里用固定 400 做充电阈值 | robot 半路没电，操作失败；按 Part 3 改用实测 reserve |
+| 回复只按 `(from, to)` 配对 | 2 件订单的两次 `ws1 → pp1` key 相同，失败标记也会残留；改用 task id |
+| 新的 `transfer(id, from, to)`、`delivered(id)`、`transferred(id)` 没有在 `types` 里声明 | `core.Base` 只声明了 2 参的 `transfer`/`transferred`，新签名要在 MyStrategy 和 MyRobot **各自**的 `types` 块里声明。同名不同参数个数能否编译没验证过；如果报错，就改成新名字（如 `job(id, from, to)`、`finished(id)`），并同步改图和报告 |
+| 跑 BasicStrategy 基线时 `Robot.astra` 已经被改过 | 基线就不干净了。先 `git diff` 确认 `Robot.astra` 和官方一致，对比表里注明每组用的是 `Robot` 还是 `MyRobot` |
 | robot 的 failure 被吞掉、不回消息 | coordinator 永远卡在 `wait`，`recover` 里一定要回 `failure` |
 | 视频只放 slides | 不算 implementation 演示 |

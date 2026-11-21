@@ -1,0 +1,6 @@
+flowchart LR
+    C2["Coordinator<br/>announces task (CFP)"] -- "cfp transfer(id, from, to)" --> RA["Robot A"] & RB2["Robot B"]
+    RA -- "propose(cost from location, energy & measured trip cost)" --> C2
+    RB2 -- propose --> C2
+    C2 -- "accept-proposal" --> RA
+    C2 -- "reject-proposal" --> RB2

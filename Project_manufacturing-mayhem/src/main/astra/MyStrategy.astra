@@ -1,28 +1,10 @@
-// ============================================================================
-// MyStrategy.astra —— COMP41400 课程的协调策略（新版 core.Base 基线）
-//
-// 与 supplied code 的关系：
-//   * core.Base 提供"查工件 / 读属性 / 调操作"的计划库，本文件只写**协调**。
-//   * core.Factory 负责按 config/*.json 建好整个工厂；本 agent 只做 lookup，
-//     不再创建任何工件（旧版那套 !setup / 自造 zone 已作废）。
-//   * Robot.astra 是 supplied 的搬运控制器；本文件通过 request/inform 驱动它，
-//     并额外处理 failure 回执（supplied 版本没有，见文件末尾说明）。
-//
-// 设计要点（对应报告里的 coordination mechanism）：
-//   1) 场景发现：直接观察 factory 工件的 observable lists，不写死任何 zone/机器名
-//   2) 任务分配：idle(r) 信念集合，取一个就立刻 -idle(r)，避免重复派工
-//   3) 订单闭环：!assign → 按 outstanding 生产 → !deliver
-//   4) 共享资源：移动前 Base 的 !at 会做 ?free 检查（occupancy only，见局限）
-//   5) 充电：完全交给 core.Base 的 !charged（按充电点 chargeRate 充到满）
-// ============================================================================
+// MyStrategy - coordinator agent
+// Factory builds everything, here just lookup + tell robots what to do
+// TODO: still sequential, one transfer at a time
 agent MyStrategy extends core.Base {
 
-    // ------------------------------------------------------------------------
-    // 本 agent 私有信念
-    //   configList(属性名, 名字列表)  —— 从 Factory 工件读到的场景清单
-    //   idle(机器人名)                —— 当前可接单的机器人（取走即删除）
-    //   failed(来源, 目的)            —— 机器人搬运失败的回执
-    // ------------------------------------------------------------------------
+    // configList: names read from factory artifact
+    // idle(r): robot free for work
     types strategy {
         formula configList(string, list);
         formula idle(string);
@@ -31,20 +13,17 @@ agent MyStrategy extends core.Base {
 
     initial !start();
 
-    // ========================================================================
-    // [1] 启动：找工件 → 发现场景 → 登记空闲机器人 → 进入订单循环
-    // ========================================================================
     plan +!start() {
         cartago.link();
 
-        // lookup（Factory 已经建好了，这里不会新建任何东西）
+        // artifacts already exist, only lookup
         !floorplan(cartago.ArtifactId _);
         !warehouse(cartago.ArtifactId _);
         !orders(cartago.ArtifactId _);
 
         !loadConfig();
 
-        // 每个机器人先登记为空闲；机器人 agent 由 Factory 按 JSON 的 agent 字段创建
+        // all robots start idle
         ?configList("robots", list robots);
         forall (string r : robots) {
             !robot(r, cartago.ArtifactId _);
@@ -55,8 +34,7 @@ agent MyStrategy extends core.Base {
         !fulfilOrders();
     }
 
-    // 读场景清单：factory 工件的 observable list 就是配置里的名字列表。
-    // 这样换 scenario（easy-02 / medium-05 …）不用改一行策略代码。
+    // read names from config so nothing is hardcoded
     plan +!loadConfig() {
         cartago.lookupArtifact("factory", cartago.ArtifactId fid);
 
@@ -86,12 +64,8 @@ agent MyStrategy extends core.Base {
 
     plan +?configList(string property, list values) : configList(property, values) { }
 
-    // ========================================================================
-    // [2] 订单主循环
-    //   新版 Orders 工件自己管队列，策略只负责"取一张 → 做完 → 再取"。
-    //   waiting 为 0 但 coming > 0 时说明订单还没到（orderArrivals 打开的场景），
-    //   此时轮询等待，而不是提前宣布结束。
-    // ========================================================================
+    // main loop
+    // waiting==0 but coming>0 -> orders not arrived yet, so wait
     plan +!fulfilOrders() {
         ?outstandingOrders(int waiting);
         ?ordersToArrive(int coming);
@@ -112,7 +86,8 @@ agent MyStrategy extends core.Base {
         cartago.println("[S] all orders delivered");
     }
 
-    // 完成一张订单：分配到 pp → 一直生产到 outstanding 为空 → deliver
+    // one order: assign, make items, deliver
+    // only first pp for now
     plan +!fulfilOne() : configList("packagingPoints", list pps) {
         string pp = P.headAsString(pps);
         !packagingPoint(pp, cartago.ArtifactId _);
@@ -122,11 +97,11 @@ agent MyStrategy extends core.Base {
 
         !produceAll(pp);
 
-        !deliver(pp);
+        !deliver(pp);  // not automatic!
         cartago.println("[S] order " + orderId + " delivered at " + pp);
     }
 
-    // outstanding 是"还没到位的零件"清单；为空表示 pp 已经凑齐
+    // keep going until pp has everything
     plan +!produceAll(string pp) {
         ?outstanding(pp, list needed);
         while (P.size(needed) > 0) {
@@ -136,7 +111,8 @@ agent MyStrategy extends core.Base {
         }
     }
 
-    // 生产一件成品：按 inputsNeeded 取料 → operate → 取走产物送 pp
+    // fetch inputs -> operate -> carry output to pp
+    // just uses first ws / ap
     plan +!produceOne(string pp) :
             configList("workstations", list wss) & configList("accessPoints", list aps) {
         string ws = P.headAsString(wss);
@@ -144,13 +120,12 @@ agent MyStrategy extends core.Base {
         !workstation(ws, cartago.ArtifactId _);
         !accessPoint(ap, cartago.ArtifactId _);
 
-        // ① 缺什么取什么（inputsNeeded 由工件维护）
         ?inputsNeeded(ws, list missing);
         while (P.size(missing) > 0) {
             string item = P.headAsString(missing);
 
             ?idle(string r);
-            -idle(r);
+            -idle(r);   // take it so nobody else gets it
             !available(ap, item);
             !transfer(r, ap, ws);
             +idle(r);
@@ -158,8 +133,7 @@ agent MyStrategy extends core.Base {
             missing = missing2;
         }
 
-        // ② 生产（Base 的 !operate 内部轮询到 done）
-        !operate(ws);
+        !operate(ws);  // blocks till done
 
         ?idle(string r);
         -idle(r);
@@ -167,16 +141,11 @@ agent MyStrategy extends core.Base {
         +idle(r);
     }
 
-    // 查询：任选一个空闲机器人。
-    // ★ ASTRA 的 guard（: 后面的条件）只做判断、**不绑定变量**；
-    //   要让 r 被绑定必须用查询计划 ?，所以这里写成 +?idle。
+    // has to be a query plan - binding in a goal's guard didn't come back out
     plan +?idle(string r) : idle(r) { }
 
-    // ========================================================================
-    // [3] 搬运协议：request → (confirm | failure)
-    //   相对 supplied BasicStrategy 的唯一增强：同时等待 transferred 与 failed，
-    //   失败时让当前任务失败，而不是永久阻塞在 wait 上。
-    // ========================================================================
+    // send request then wait for reply or failure
+    // (supplied version could hang forever here)
     plan +!transfer(string name, string from, string to) {
         send(request, name, transfer(from, to));
         wait(transferred(from, to) | failed(from, to));

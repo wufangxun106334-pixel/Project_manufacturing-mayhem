@@ -16,8 +16,7 @@ agent Robot extends core.Base {
     plan @message(request, string sender, transfer(string from, string to)) {
         cartago.println("received request for transfer from: "  + from + " to: " +to);
 
-        // ADDED (course project change): supplied 版本任何一步抛异常都不回信，
-        // 请求方会永久阻塞在 wait 上；这里补 failure 分支。
+        // added: send failure back, otherwise strategy waits forever
         try {
             !at(S.name(), from);
             !holding(S.name(), string _);

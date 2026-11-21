@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Manufacturing Mayhem — Project Design</title>
+<style>
+  @page { size: A4 landscape; margin: 12mm 14mm 14mm 14mm; }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 10.5pt; line-height: 1.45; color: #1a1a1a; }
+  h1 { font-size: 20pt; margin: 0 0 4px 0; }
+  .sub { color: #555; margin-bottom: 14px; }
+  h2 { font-size: 13.5pt; margin: 18px 0 6px 0; border-bottom: 1px solid #ccc; padding-bottom: 3px; }
+  h3 { font-size: 11pt; margin: 12px 0 4px 0; }
+  p { margin: 5px 0; }
+  ul { margin: 4px 0 6px 18px; padding: 0; }
+  li { margin: 2px 0; }
+  code { font-family: Menlo, Consolas, monospace; font-size: 9pt; background: #f3f3f3; padding: 0 2px; }
+  table { border-collapse: collapse; width: 100%; margin: 6px 0 8px 0; font-size: 9.5pt; }
+  th, td { border: 1px solid #bbb; padding: 4px 6px; vertical-align: top; text-align: left; }
+  th { background: #efefef; }
+  figure { margin: 10px 0 6px 0; text-align: center; page-break-inside: avoid; }
+  figure img { max-width: 100%; }
+  figcaption { font-size: 9.5pt; color: #333; text-align: left; margin-top: 4px; }
+  
+  .fig2 img { max-height: 132mm !important; }
+  .fig3 img { max-height: 150mm; }
+  .fig4 img { max-height: 70mm; }
+  .pb { page-break-before: always; }
+  .land { page-break-before: always; }
+  .land figure img { max-height: 150mm; max-width: 100%; }
+  .fig3 img { width: 100%; }
+  .note { font-size: 9.5pt; color: #444; }
+</style>
+</head>
+<body>
+
+<h1>Manufacturing Mayhem — Project Design</h1>
+<div class="sub">COMP41400 Multi-Agent Systems · Architecture and interaction diagrams · fangxun wu, 25208508 · 21.11.2027</div>
+
+<h2>1. Overview</h2>
+<p>The system uses a <b>central coordinator</b> organisation built on top of the supplied CArtAgO environment. One coordinator agent, <code>MyStrategy</code>, decides <i>what</i> is done and <i>by whom</i>. One controller agent per robot, <code>MyRobot</code>, decides <i>how</i> a transfer is physically carried out, including waiting for occupied locations and charging. The environment artifacts decide what is <i>legal</i>: they enforce capacity, energy limits and recipes. No artifact is modified.</p>
+
+<table>
+  <tr><th style="width:18%">Agent</th><th style="width:12%">Instances</th><th style="width:36%">Responsibilities</th><th>Information maintained</th></tr>
+  <tr><td><code>MyStrategy</code> (coordinator)</td><td>1</td><td>Discover resources; assign orders to packaging points; allocate transfers to robots; trigger workstation operation and order delivery</td><td>Resource lists, product → workstation map <code>makes(ws, product)</code>, <code>busy(robot)</code>, <code>busyPP(pp)</code>, <code>usedAp(ap)</code>, pending tasks <code>task(id, robot, from, to)</code></td></tr>
+  <tr><td><code>MyRobot</code> (controller)</td><td>1 per robot</td><td>Execute one transfer at a time; wait and retry occupied locations; decide when to charge</td><td>Own location, held item and energy; <code>travelDistance</code> option; largest measured transfer energy cost</td></tr>
+  <tr><td><code>Main</code>, <code>core.Factory</code> (supplied)</td><td>1 each</td><td>Select the scenario, build the environment from JSON, create the robot agents and the coordinator</td><td>—</td></tr>
+</table>
+
+<h3>Notation</h3>
+<ul>
+  <li>Solid arrows: messages between agents, or an agent calling an artifact operation / reading a property.</li>
+  <li>Dashed arrows: agent creation, or linked operations between artifacts (never called directly by agents).</li>
+  <li>Messages follow FIPA performatives: <code>request</code>, <code>inform</code>, <code>failure</code>. Every transfer carries a task id <code>t1, t2, …</code>.</li>
+</ul>
+
+<div class="land">
+<h2>2. Architecture: organisation and communication</h2>
+<figure>
+  <img src="fig1a.svg" alt="Figure 1a">
+  <figcaption><b>Figure 1a.</b> Agent organisation. <code>Main</code> asks the supplied <code>core.Factory</code> agent to build the environment from the scenario JSON; the factory creates one <code>MyRobot</code> per robot (from the <code>agent</code> field) and <code>Main</code> then starts the coordinator. All coordination flows through one protocol: <code>request transfer(id, from, to)</code>, answered by <code>inform delivered(id)</code> after unloading, <code>inform transferred(id)</code> once the robot is parked and available, or <code>failure transfer(id, from, to)</code>.</figcaption>
+</figure>
+</div>
+
+<div class="land">
+<h2>2. Architecture (continued): agents and environment artifacts</h2>
+<figure>
+  <img src="fig1b.svg" alt="Figure 1b">
+  <figcaption><b>Figure 1b.</b> How each agent obtains information and acts. Solid arrows: operations called or properties read by agents. Dashed arrows: linked operations between artifacts, which agents never call directly. The coordinator reads configuration lists, order counters, workstation and packaging-point state; each robot reads the <code>travelDistance</code> option itself and acts only on its own Robot artifact. Storage points exist but are not used by this single-stage design.</figcaption>
+</figure>
+</div>
+
+<div class="land">
+<h2>3. Worked example: one apple-pie order (easy-02)</h2>
+<figure class="fig2">
+  <img src="fig2.svg" alt="Figure 2 sequence diagram">
+  <figcaption><b>Figure 2.</b> Fulfilment of order-1 in easy-02 (two robots, two access points, one workstation, two packaging points; travelDistance off). Timings follow the scenario rules: move 4 s, load/unload 2 s, operate 2 s. Because <code>Floorplan.move</code> reserves the target on departure, the second robot retries until the first leaves ws1 at about 12 s. The first robot is back at its charger and released (<code>transferred</code>) at about 16 s, before ws1 finishes at about 20 s, so the output can be dispatched without waiting. Which robot reaches ws1 first is not deterministic. Robots with 800 energy skip charging after the first trip (400 left = reserve) and charge after the second (0 left).</figcaption>
+</figure>
+</div>
+
+<h2 class="pb">4. Robot controller lifecycle</h2>
+<figure class="fig3">
+  <img src="fig3.svg" alt="Figure 3 state diagram">
+  <figcaption><b>Figure 3.</b> States of a <code>MyRobot</code> controller. ① <code>request transfer(id, from, to)</code>; ② <code>inform delivered(id)</code> sent right after unloading; ③ <code>inform transferred(id)</code> sent once parked (and charged if needed), which releases the robot; ④ <code>failure transfer(id, from, to)</code>. <code>arrived*</code>: every move uses a bounded wait-and-retry, because checking that a location is free is not a reservation. Every working state, including the return to the charger and charging, is guarded: any failure is reported with <code>failure transfer(id, from, to)</code>. The robot then stays where it failed and keeps any item it was holding; it can still accept a new request.</figcaption>
+</figure>
+
+<h3>Charging rule</h3>
+<ul>
+  <li><b>travelDistance off</b> (easy-01, 02, 04): reserve = 400, the worst case from the charger (3 moves × 100 + load/unload 2 × 50, and both handling steps need at least 100 energy to start).</li>
+  <li><b>travelDistance on</b> (easy-03, all medium and hard scenarios): agents cannot query distances, so each robot measures the energy used per transfer and sets reserve = min(largest measured cost + 50, maxEnergy). It charges to full before every job until a trip has been measured.</li>
+  <li>Limitation: a longer route than any measured so far may be underestimated.</li>
+</ul>
+
+<h2 class="pb">5. Alternative considered: Contract Net</h2>
+<figure class="fig4">
+  <img src="fig4.svg" alt="Figure 4 contract net">
+  <figcaption><b>Figure 4.</b> Contract Net alternative. The coordinator announces each transfer; robots bid using locally observable information (current location, energy and measured trip costs); the coordinator awards the task.</figcaption>
+</figure>
+<p>Contract Net would use each robot's local knowledge better, but it adds a negotiation round to every task and requires bids to be managed while robots are committed elsewhere. In the required scenarios easy-02 and easy-04 travel cost is uniform and fleets are small (at most six robots in any scenario), so central allocation is simpler and prevents double allocation directly. Because easy-03 and all medium and hard scenarios enable travelDistance, Contract Net is the main candidate extension.</p>
+
+<h2>6. Assumptions and scope</h2>
+<ul>
+  <li>Each product is made by one workstation in one stage. Two-stage recipes that need storage buffering (medium-07) are out of scope.</li>
+  <li>Mixed single-stage products (medium-08) fit the product → workstation map, but only one order is advanced at a time, so several workstations are not used in parallel (this also limits medium-05).</li>
+  <li>Replies are correlated by sender and task id; within one input batch the route alone would already be unambiguous because each input uses a distinct access point.</li>
+  <li>The supplied environment, scenario resources, stock, recipes, seeds and options are unchanged; only the robot <code>agent</code> field is changed in documented copies of the scenario files.</li>
+</ul>
+
+</body>
+</html>

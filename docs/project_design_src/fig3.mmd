@@ -1,0 +1,9 @@
+flowchart LR
+    P([Parked]) -- "① request" --> TS([ToSource])
+    TS -- "arrived*, load" --> TT([ToTarget])
+    TT -- "arrived*, unload<br/>② delivered" --> R([Returning])
+    R -- "③ ≥ reserve" --> P
+    R -- "&lt; reserve" --> C([Charging])
+    C -- "③ full" --> P
+    TS & TT & R & C -. "④ error" .-> F([Stranded])
+    F -- "next ①" --> TS

@@ -1,0 +1,27 @@
+flowchart LR
+    COORD["<b>MyStrategy</b>"]
+    ROB["<b>MyRobot</b> × N"]
+    FA[("Factory artifact<br/>config lists, options")]
+    ORD[(Orders)]
+    WS[("Workstations<br/>output, inputsNeeded, state")]
+    PP[("Packaging points<br/>outstanding")]
+    AP[(Access points)]
+    RB[("Robot artifacts<br/>at, holding, energy")]
+    FP[("Floorplan<br/>occupancy")]
+    WH[(Warehouse)]
+    CP[(Charge points)]
+    SP[("Storage points<br/>(not used)")]
+    COORD -- "observe lists" --> FA
+    COORD -- "assign, counts" --> ORD
+    COORD -- "inputsNeeded, state, operate" --> WS
+    COORD -- "outstanding, deliver" --> PP
+    COORD -- "retrieve" --> AP
+    ROB -- "read options" --> FA
+    ROB -- "isOccupied" --> FP
+    ROB -- "move, load, unload, charge" --> RB
+    RB -. "give / take" .-> WS & PP & AP & SP
+    RB -. "move" .-> FP
+    RB -. "charge" .-> CP
+    AP -. "retrieve" .-> WH
+    ORD -. "assign" .-> PP
+    PP -. "completed" .-> ORD

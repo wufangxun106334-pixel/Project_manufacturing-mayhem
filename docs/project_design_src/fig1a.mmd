@@ -1,0 +1,9 @@
+flowchart LR
+    MAIN["<b>Main</b><br/>select scenario"]
+    FAC["<b>core.Factory</b> agent<br/>build environment from JSON"]
+    COORD["<b>MyStrategy</b> — coordinator<br/>• discover resources<br/>• assign orders to packaging points<br/>• allocate transfers (task id)<br/>• track busy robots / pps / aps<br/>• trigger operate & deliver"]
+    ROB["<b>MyRobot</b> × N — one per robot<br/>• one transfer at a time<br/>• wait & retry occupied locations<br/>• decide charging"]
+    MAIN -- "request configure /<br/>agree, configured" --- FAC
+    MAIN -- "createAgent" --> COORD
+    FAC -. "creates (agent field)" .-> ROB
+    COORD <-- "→ request transfer(id, from, to)<br/>← inform delivered(id), inform transferred(id)<br/>← failure transfer(id, from, to)" --> ROB

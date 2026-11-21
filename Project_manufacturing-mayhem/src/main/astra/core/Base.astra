@@ -2,13 +2,10 @@ package core;
 
 agent Base {
     types main {
-        formula floorplan(cartago.ArtifactId);
-        
+        formula floorplan(cartago.ArtifactId);      
         formula warehouse(cartago.ArtifactId);
         formula accessPoint(string, cartago.ArtifactId);
-
         formula storagePoint(string, cartago.ArtifactId);
-
         formula chargePoint(string, cartago.ArtifactId);
         formula robot(string, cartago.ArtifactId);
         formula at(string, string);
